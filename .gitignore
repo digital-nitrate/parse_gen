@@ -1,0 +1,6 @@
+*.o
+/obj/
+/gen/
+/parse_gen
+
+!/test/
