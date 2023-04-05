@@ -101,7 +101,11 @@ decl:
 	PROBLOCK {
 		int res = 0;
 		DYNARR_CHK(out->prologue_cnt, out->prologue_cap, out->prologue, res);
-		if (res) {fprintf(stderr, "memory failure\n");YYERROR;}
+		if (res) {
+			fputs("memory failure\n", stderr);
+			free($1.data);
+			YYERROR;
+		}
 		out->prologue[out->prologue_cnt] = $1;
 		++(out->prologue_cnt);
 	}
@@ -109,6 +113,8 @@ decl:
 		gen_ref* ar = malloc((sizeof *ar) * 16);
 		if (ar == NULL) {
 			fputs("memory failure\n", stderr);
+			free($2.data);
+			free($3.data);
 			YYERROR;
 		}
 		gen_sid sym = hash_add(out, hash, $3, 1);
@@ -119,6 +125,8 @@ decl:
 				fprintf(stderr, "%d:%d->%d:%d$ symbol already defined\n", @3.first_line, @3.first_column, @3.last_line, @3.last_column);
 			}
 			free(ar);
+			free($2.data);
+			free($3.data);
 			YYERROR;
 		}
 		out->tokens[sym.ind].type = $2;
@@ -129,12 +137,16 @@ decl:
 		gen_ref* ar = malloc((sizeof *ar) * 16);
 		if (ar == NULL) {
 			fputs("memory failure\n", stderr);
+			free($2.data);
+			free($3.data);
 			YYERROR;
 		}
 		gen_ref* al = malloc((sizeof *al) * 16);
 		if (al == NULL) {
 			fputs("memory failure\n", stderr);
 			free(ar);
+			free($2.data);
+			free($3.data);
 			YYERROR;
 		}
 		gen_sid sym = hash_add(out, hash, $3, 0);
@@ -146,6 +158,8 @@ decl:
 			}
 			free(al);
 			free(ar);
+			free($2.data);
+			free($3.data);
 			YYERROR;
 		}
 		out->nterms[sym.ind].type = $2;
@@ -155,9 +169,11 @@ decl:
 	| STARTDECL IDEN {
 		if (out->start.error == 0) {
 			fprintf(stderr, "%d:%d->%d:%d$ start already set\n", @1.first_line, @1.first_column, @1.last_line, @1.last_column);
+			free($2.data);
 			YYERROR;
 		}
 		gen_sid sym = hash_ld(out, hash, $2);
+		free($2.data);
 		if (sym.error) {
 			fprintf(stderr, "%d:%d->%d:%d$ no symbol found\n", @2.first_line, @2.first_column, @2.last_line, @2.last_column);
 			YYERROR;
@@ -166,12 +182,14 @@ decl:
 			fprintf(stderr, "%d:%d->%d:%d$ expected nonterminal\n", @2.first_line, @2.first_column, @2.last_line, @2.last_column);
 			YYERROR;
 		}
-		free($2.data);
 		out->start = sym;
 	}
 	| DEFINEDECL IDEN DOT IDEN IDEN {
 		if (out->prefix.data != NULL || $2.len != api_len || memcmp(api_str, $2.data, api_len) != 0 || $4.len != prefix_len || memcmp(prefix_str, $4.data, prefix_len) != 0) {
 			fprintf(stderr, "%d:%d->%d:%d$ unknown name\n", @2.first_line, @2.first_column, @4.last_line, @4.last_column);
+			free($2.data);
+			free($4.data);
+			free($5.data);
 			YYERROR;
 		}
 		free($2.data);
@@ -183,6 +201,8 @@ decl:
 		DYNARR_CHK(out->param_cnt, out->param_cap, out->params, res);
 		if (res) {
 			fprintf(stderr, "memory failure\n");
+			free($2.data);
+			free($3.data);
 			YYERROR;
 		}
 		out->params[out->param_cnt].type = $2;
@@ -192,7 +212,7 @@ decl:
 	;
 
 typeopt:
-	%empty {$$ = (struct string){.data = NULL, .len = 0};}
+	%empty {$$ = (struct string){.data = NULL, .len = 0, .cap = 0};}
 	| TYPESPEC {$$ = $1;}
 	;
 
@@ -200,7 +220,15 @@ rules:
 	%empty
 	| rules IDEN COL patterns SCL {
 		gen_sid sym = hash_ld(out, hash, $2);
-		if (sym.error || sym.term) {YYERROR;}
+		free($2.data);
+		if (sym.error) {
+			fprintf(stderr, "%d:%d->%d:%d$ no symbol found\n", @2.first_line, @2.first_column, @2.last_line, @2.last_column);
+			YYERROR;
+		}
+		if (sym.term) {
+			fprintf(stderr, "%d:%d->%d:%d$ expected nonterminal\n", @2.first_line, @2.first_column, @2.last_line, @2.last_column);
+			YYERROR;
+		}
 		gen_rarr* r = &(out->nterms[sym.ind].lh);
 		for (size_t i = $4.low; i < $4.high; ++i) {
 			int res = 0;
@@ -213,7 +241,6 @@ rules:
 			++(r->cnt);
 			out->rules[i].lhs = sym;
 		}
-		free($2.data);
 	}
 
 patterns:
@@ -281,7 +308,11 @@ slist:
 	}
 	| slist IDEN {
 		gen_sid sym = hash_ld(out, hash, $2);
-		if (sym.error) {YYERROR;}
+		free($2.data);
+		if (sym.error) {
+			fprintf(stderr, "%d:%d->%d:%d$ no symbol found\n", @2.first_line, @2.first_column, @2.last_line, @2.last_column);
+			YYERROR;
+		}
 		int res = 0;
 		DYNARR_CHK($1.cnt, $1.cap, $1.syms, res);
 		if (res) {
@@ -291,7 +322,6 @@ slist:
 		$1.syms[$1.cnt] = sym;
 		++($1.cnt);
 		$$ = $1;
-		free($2.data);
 	}
 
 actopt:

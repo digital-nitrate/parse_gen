@@ -27,7 +27,7 @@ unsigned int* gen_bld_ll1(gen_type const* gen) {
 		for (size_t i = 0; i < rs.cnt; ++i) {
 			gen_rule* rule = &(gen->rules[rs.rules[i].rule]);
 			if (lambda[rule->lhs.ind]) continue;
-			if (rs.rules[i].loc < rsaves[rs.rules[i].rule]) continue;
+			if (rs.rules[i].loc > rsaves[rs.rules[i].rule]) continue;
 			size_t cntr = rs.rules[i].loc;
 			while (cntr < rule->rhs.cnt && rule->rhs.syms[cntr].term == 0 && lambda[rule->rhs.syms[cntr].ind]) ++cntr;
 			if (cntr == rule->rhs.cnt) {
@@ -110,7 +110,7 @@ unsigned int* gen_bld_ll1(gen_type const* gen) {
 						queue[queue_top] = sym;
 						++queue_top;
 					}
-					if (lambda[sym.ind] == 0 || first[sym.ind] == 0) break;
+					if (lambda[sym.ind] == 0 || first[sym.ind] == 1) break;
 				} else {
 					break;
 				}
@@ -140,7 +140,7 @@ unsigned int* gen_bld_ll1(gen_type const* gen) {
 							queue[queue_top] = sym;
 							++queue_top;
 						}
-						if (lambda[sym.ind] == 0 || first[sym.ind] == 0) break;
+						if (lambda[sym.ind] == 0 || first[sym.ind] == 1) break;
 					} else {
 						break;
 					}
@@ -170,7 +170,7 @@ unsigned int* gen_bld_ll1(gen_type const* gen) {
 							queue[queue_top] = sym;
 							++queue_top;
 						}
-						if (lambda[sym.ind] == 0 || first[sym.ind] == 0) break;
+						if (lambda[sym.ind] == 0 || first[sym.ind] == 1) break;
 					} else {
 						break;
 					}

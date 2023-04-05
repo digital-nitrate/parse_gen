@@ -8,7 +8,7 @@
 		if (np == NULL) {\
 			(res) = 1;\
 		} else {\
-			(cnt) = nc;\
+			(cap) = nc;\
 			(arr) = np;\
 		}\
 	}\
