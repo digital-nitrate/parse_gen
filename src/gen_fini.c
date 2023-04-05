@@ -8,11 +8,14 @@ extern void gen_fini(gen_type* gen) {
 	for (size_t i = 0; i < gen->token_cnt; ++i) {
 		free(gen->tokens[i].name.data);
 		free(gen->tokens[i].type.data);
+		free(gen->tokens[i].rh.rules);
 	}
 	free(gen->tokens);
 	for (size_t i = 0; i < gen->nterm_cnt; ++i) {
 		free(gen->nterms[i].name.data);
 		free(gen->nterms[i].type.data);
+		free(gen->nterms[i].rh.rules);
+		free(gen->nterms[i].lh.rules);
 	}
 	free(gen->nterms);
 	for (size_t i = 0; i < gen->param_cnt; ++i) {
@@ -38,4 +41,6 @@ extern void gen_fini(gen_type* gen) {
 		}
 	}
 	free(gen->rules);
+	free(gen->prefix.data);
+	free(gen->epilogue.data);
 }

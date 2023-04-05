@@ -9,7 +9,7 @@ GEN:=gen
 CC:=clang
 CFLAGS:=-Werror -Wall -Wextra -std=gnu17 -I$(SRC) -I$(GEN) -fPIC -flto -Ofast $(D)
 LDFLAGS:=-flto -fPIE -Ofast
-RELEASE_FLAGS:=-g0 -fno-asynchronous-unwind-tables -fno-unwind-tables
+RELEASE_FLAGS:=-g -fno-asynchronous-unwind-tables -fno-unwind-tables
 DEBUG_FLAGS:=-fsanitize=address -fsanitize=undefined -g
 
 rwildcard=$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
