@@ -2,20 +2,44 @@
 #include <stdlib.h>
 #include "regular.h"
 
+static int init_node(reg_nfa_table* table) {
+	unsigned int* p = malloc((sizeof *p) * 16);
+	if (p == NULL) return 1;
+	int res = 0;
+	DYNARR_CHK(table->node_cnt, table->node_cap, table->nodes, res);
+	if (res) {free(p); return 1;}
+	table->nodes[table->node_cnt].lambda = (reg_nfa_lam){.paths=p,.cnt=0,.cap=16};
+	for (size_t i = 0; i < (1 << CHAR_BIT); ++i) {
+		table->nodes[table->node_cnt].tran[i] = UINT_MAX;
+	}
+	++(table->node_cnt);
+	return 0;
+}
+
+static int add_path(reg_nfa_node* node, unsigned int goal) {
+	int res = 0;
+	DYNARR_CHK(node->lambda.cnt, node->lambda.cap, node->lambda.paths, res);
+	if (res) return 1;
+	node->lambda.paths[node->lambda.cnt] = goal;
+	++(node->lambda.cnt);
+	return 0;
+}
+
+
 typedef union YYSTYPE {
 	char chara;
-	reg ALT;
+	reg_in ALT;
 	struct reg_link* ALTLIST;
-	reg SEQ;
+	reg_in SEQ;
 	struct reg_link* SEQLIST;
-	reg ATOM;
+	reg_in ATOM;
 	enum atommod_type ATOMMOD;
-	reg NUCLEUS;
+	reg_in NUCLEUS;
 	struct charrng CHARRNG;
 } YYSTYPE;
 
 
-extern int yylex(YYSTYPE* lvalp, reg* out, void* scanner);
+extern int yylex(YYSTYPE* lvalp, reg_nfa* out, void* scanner);
 
 static unsigned int _yytran(int code) {
 	switch (code) {
@@ -42,34 +66,34 @@ static unsigned int _yytran(int code) {
 	}
 }
 
-static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYSTYPE* _yylvalp, reg* out, void* scanner) {
+static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYSTYPE* _yylvalp, reg_nfa* out, void* scanner) {
 	YYSTYPE _yybuffer[3];
 	switch (_yyid) {
 		case 0:
 			switch (*_yytid) {
 				case 0: {
 					if (_yyreq(1, _yytid, _yytvl, _yybuffer + 0, out, scanner)) return 1;
-*out = ((_yybuffer + 0)->ALT);
+out->specials = ((_yybuffer + 0)->ALT);
 					break;
 				}
 				case 3: {
 					if (_yyreq(1, _yytid, _yytvl, _yybuffer + 0, out, scanner)) return 1;
-*out = ((_yybuffer + 0)->ALT);
+out->specials = ((_yybuffer + 0)->ALT);
 					break;
 				}
 				case 5: {
 					if (_yyreq(1, _yytid, _yytvl, _yybuffer + 0, out, scanner)) return 1;
-*out = ((_yybuffer + 0)->ALT);
+out->specials = ((_yybuffer + 0)->ALT);
 					break;
 				}
 				case 6: {
 					if (_yyreq(1, _yytid, _yytvl, _yybuffer + 0, out, scanner)) return 1;
-*out = ((_yybuffer + 0)->ALT);
+out->specials = ((_yybuffer + 0)->ALT);
 					break;
 				}
 				case 8: {
 					if (_yyreq(1, _yytid, _yytvl, _yybuffer + 0, out, scanner)) return 1;
-*out = ((_yybuffer + 0)->ALT);
+out->specials = ((_yybuffer + 0)->ALT);
 					break;
 				}
 				default:
@@ -85,11 +109,20 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 		if (((_yybuffer + 1)->ALTLIST) == NULL) {
 			(_yylvalp->ALT) = ((_yybuffer + 0)->SEQ);
 		} else {
-			struct reg_link* top = malloc(sizeof *top);
-			top->next = ((_yybuffer + 1)->ALTLIST);
-			top->sub = ((_yybuffer + 0)->SEQ);
-			(_yylvalp->ALT).type = REG_ALT;
-			(_yylvalp->ALT).alt = top;
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->SEQ).start)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->SEQ).end]), out->table.node_cnt - 1)) exit(1);
+			struct reg_link* curr = ((_yybuffer + 1)->ALTLIST);
+			while (curr != NULL) {
+				struct reg_link* tmp = curr;
+				if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), tmp->sub.start)) exit(1);
+				if (add_path(&(out->table.nodes[tmp->sub.end]), out->table.node_cnt - 1)) exit(1);
+				curr = tmp->next;
+				free(tmp);
+			}
+			(_yylvalp->ALT).start = out->table.node_cnt - 2;
+			(_yylvalp->ALT).end = out->table.node_cnt - 1;
 		}
 	
 					break;
@@ -101,11 +134,20 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 		if (((_yybuffer + 1)->ALTLIST) == NULL) {
 			(_yylvalp->ALT) = ((_yybuffer + 0)->SEQ);
 		} else {
-			struct reg_link* top = malloc(sizeof *top);
-			top->next = ((_yybuffer + 1)->ALTLIST);
-			top->sub = ((_yybuffer + 0)->SEQ);
-			(_yylvalp->ALT).type = REG_ALT;
-			(_yylvalp->ALT).alt = top;
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->SEQ).start)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->SEQ).end]), out->table.node_cnt - 1)) exit(1);
+			struct reg_link* curr = ((_yybuffer + 1)->ALTLIST);
+			while (curr != NULL) {
+				struct reg_link* tmp = curr;
+				if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), tmp->sub.start)) exit(1);
+				if (add_path(&(out->table.nodes[tmp->sub.end]), out->table.node_cnt - 1)) exit(1);
+				curr = tmp->next;
+				free(tmp);
+			}
+			(_yylvalp->ALT).start = out->table.node_cnt - 2;
+			(_yylvalp->ALT).end = out->table.node_cnt - 1;
 		}
 	
 					break;
@@ -117,11 +159,20 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 		if (((_yybuffer + 1)->ALTLIST) == NULL) {
 			(_yylvalp->ALT) = ((_yybuffer + 0)->SEQ);
 		} else {
-			struct reg_link* top = malloc(sizeof *top);
-			top->next = ((_yybuffer + 1)->ALTLIST);
-			top->sub = ((_yybuffer + 0)->SEQ);
-			(_yylvalp->ALT).type = REG_ALT;
-			(_yylvalp->ALT).alt = top;
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->SEQ).start)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->SEQ).end]), out->table.node_cnt - 1)) exit(1);
+			struct reg_link* curr = ((_yybuffer + 1)->ALTLIST);
+			while (curr != NULL) {
+				struct reg_link* tmp = curr;
+				if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), tmp->sub.start)) exit(1);
+				if (add_path(&(out->table.nodes[tmp->sub.end]), out->table.node_cnt - 1)) exit(1);
+				curr = tmp->next;
+				free(tmp);
+			}
+			(_yylvalp->ALT).start = out->table.node_cnt - 2;
+			(_yylvalp->ALT).end = out->table.node_cnt - 1;
 		}
 	
 					break;
@@ -133,11 +184,20 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 		if (((_yybuffer + 1)->ALTLIST) == NULL) {
 			(_yylvalp->ALT) = ((_yybuffer + 0)->SEQ);
 		} else {
-			struct reg_link* top = malloc(sizeof *top);
-			top->next = ((_yybuffer + 1)->ALTLIST);
-			top->sub = ((_yybuffer + 0)->SEQ);
-			(_yylvalp->ALT).type = REG_ALT;
-			(_yylvalp->ALT).alt = top;
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->SEQ).start)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->SEQ).end]), out->table.node_cnt - 1)) exit(1);
+			struct reg_link* curr = ((_yybuffer + 1)->ALTLIST);
+			while (curr != NULL) {
+				struct reg_link* tmp = curr;
+				if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), tmp->sub.start)) exit(1);
+				if (add_path(&(out->table.nodes[tmp->sub.end]), out->table.node_cnt - 1)) exit(1);
+				curr = tmp->next;
+				free(tmp);
+			}
+			(_yylvalp->ALT).start = out->table.node_cnt - 2;
+			(_yylvalp->ALT).end = out->table.node_cnt - 1;
 		}
 	
 					break;
@@ -149,11 +209,20 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 		if (((_yybuffer + 1)->ALTLIST) == NULL) {
 			(_yylvalp->ALT) = ((_yybuffer + 0)->SEQ);
 		} else {
-			struct reg_link* top = malloc(sizeof *top);
-			top->next = ((_yybuffer + 1)->ALTLIST);
-			top->sub = ((_yybuffer + 0)->SEQ);
-			(_yylvalp->ALT).type = REG_ALT;
-			(_yylvalp->ALT).alt = top;
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->SEQ).start)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->SEQ).end]), out->table.node_cnt - 1)) exit(1);
+			struct reg_link* curr = ((_yybuffer + 1)->ALTLIST);
+			while (curr != NULL) {
+				struct reg_link* tmp = curr;
+				if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), tmp->sub.start)) exit(1);
+				if (add_path(&(out->table.nodes[tmp->sub.end]), out->table.node_cnt - 1)) exit(1);
+				curr = tmp->next;
+				free(tmp);
+			}
+			(_yylvalp->ALT).start = out->table.node_cnt - 2;
+			(_yylvalp->ALT).end = out->table.node_cnt - 1;
 		}
 	
 					break;
@@ -165,11 +234,20 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 		if (((_yybuffer + 1)->ALTLIST) == NULL) {
 			(_yylvalp->ALT) = ((_yybuffer + 0)->SEQ);
 		} else {
-			struct reg_link* top = malloc(sizeof *top);
-			top->next = ((_yybuffer + 1)->ALTLIST);
-			top->sub = ((_yybuffer + 0)->SEQ);
-			(_yylvalp->ALT).type = REG_ALT;
-			(_yylvalp->ALT).alt = top;
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->SEQ).start)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->SEQ).end]), out->table.node_cnt - 1)) exit(1);
+			struct reg_link* curr = ((_yybuffer + 1)->ALTLIST);
+			while (curr != NULL) {
+				struct reg_link* tmp = curr;
+				if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), tmp->sub.start)) exit(1);
+				if (add_path(&(out->table.nodes[tmp->sub.end]), out->table.node_cnt - 1)) exit(1);
+				curr = tmp->next;
+				free(tmp);
+			}
+			(_yylvalp->ALT).start = out->table.node_cnt - 2;
+			(_yylvalp->ALT).end = out->table.node_cnt - 1;
 		}
 	
 					break;
@@ -191,6 +269,7 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 					if (_yyreq(2, _yytid, _yytvl, _yybuffer + 2, out, scanner)) return 1;
 
 		struct reg_link* top = malloc(sizeof *top);
+		if (top == NULL) exit(1);
 		top->next = ((_yybuffer + 2)->ALTLIST);
 		top->sub = ((_yybuffer + 1)->SEQ);
 		(_yylvalp->ALTLIST) = top;
@@ -212,7 +291,13 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 		case 3:
 			switch (*_yytid) {
 				case 0: {
-(_yylvalp->SEQ).type = REG_LAMBDA;
+
+		if (init_node(&(out->table))) exit(1);
+		if (init_node(&(out->table))) exit(1);
+		if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), out->table.node_cnt - 1)) exit(1);
+		(_yylvalp->SEQ).start = out->table.node_cnt - 2;
+		(_yylvalp->SEQ).end = out->table.node_cnt - 1;
+	
 					break;
 				}
 				case 3: {
@@ -222,17 +307,33 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 		if (((_yybuffer + 1)->SEQLIST) == NULL) {
 			(_yylvalp->SEQ) = ((_yybuffer + 0)->ATOM);
 		} else {
-			struct reg_link* top = malloc(sizeof *top);
-			top->next = ((_yybuffer + 1)->SEQLIST);
-			top->sub = ((_yybuffer + 0)->ATOM);
-			(_yylvalp->SEQ).type = REG_SEQ;
-			(_yylvalp->SEQ).seq = top;
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->ATOM).start)) exit(1);
+			unsigned int save = ((_yybuffer + 0)->ATOM).end;
+			struct reg_link* curr = ((_yybuffer + 1)->SEQLIST);
+			while (curr != NULL) {
+				struct reg_link* tmp = curr;
+				if (add_path(&(out->table.nodes[save]), tmp->sub.start)) exit(1);
+				save = tmp->sub.end;
+				curr = tmp->next;
+				free(tmp);
+			}
+			if (add_path(&(out->table.nodes[save]), out->table.node_cnt - 1)) exit(1);
+			(_yylvalp->SEQ).start = out->table.node_cnt - 2;
+			(_yylvalp->SEQ).end = out->table.node_cnt - 1;
 		}
 	
 					break;
 				}
 				case 4: {
-(_yylvalp->SEQ).type = REG_LAMBDA;
+
+		if (init_node(&(out->table))) exit(1);
+		if (init_node(&(out->table))) exit(1);
+		if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), out->table.node_cnt - 1)) exit(1);
+		(_yylvalp->SEQ).start = out->table.node_cnt - 2;
+		(_yylvalp->SEQ).end = out->table.node_cnt - 1;
+	
 					break;
 				}
 				case 5: {
@@ -242,11 +343,21 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 		if (((_yybuffer + 1)->SEQLIST) == NULL) {
 			(_yylvalp->SEQ) = ((_yybuffer + 0)->ATOM);
 		} else {
-			struct reg_link* top = malloc(sizeof *top);
-			top->next = ((_yybuffer + 1)->SEQLIST);
-			top->sub = ((_yybuffer + 0)->ATOM);
-			(_yylvalp->SEQ).type = REG_SEQ;
-			(_yylvalp->SEQ).seq = top;
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->ATOM).start)) exit(1);
+			unsigned int save = ((_yybuffer + 0)->ATOM).end;
+			struct reg_link* curr = ((_yybuffer + 1)->SEQLIST);
+			while (curr != NULL) {
+				struct reg_link* tmp = curr;
+				if (add_path(&(out->table.nodes[save]), tmp->sub.start)) exit(1);
+				save = tmp->sub.end;
+				curr = tmp->next;
+				free(tmp);
+			}
+			if (add_path(&(out->table.nodes[save]), out->table.node_cnt - 1)) exit(1);
+			(_yylvalp->SEQ).start = out->table.node_cnt - 2;
+			(_yylvalp->SEQ).end = out->table.node_cnt - 1;
 		}
 	
 					break;
@@ -258,17 +369,33 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 		if (((_yybuffer + 1)->SEQLIST) == NULL) {
 			(_yylvalp->SEQ) = ((_yybuffer + 0)->ATOM);
 		} else {
-			struct reg_link* top = malloc(sizeof *top);
-			top->next = ((_yybuffer + 1)->SEQLIST);
-			top->sub = ((_yybuffer + 0)->ATOM);
-			(_yylvalp->SEQ).type = REG_SEQ;
-			(_yylvalp->SEQ).seq = top;
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->ATOM).start)) exit(1);
+			unsigned int save = ((_yybuffer + 0)->ATOM).end;
+			struct reg_link* curr = ((_yybuffer + 1)->SEQLIST);
+			while (curr != NULL) {
+				struct reg_link* tmp = curr;
+				if (add_path(&(out->table.nodes[save]), tmp->sub.start)) exit(1);
+				save = tmp->sub.end;
+				curr = tmp->next;
+				free(tmp);
+			}
+			if (add_path(&(out->table.nodes[save]), out->table.node_cnt - 1)) exit(1);
+			(_yylvalp->SEQ).start = out->table.node_cnt - 2;
+			(_yylvalp->SEQ).end = out->table.node_cnt - 1;
 		}
 	
 					break;
 				}
 				case 8: {
-(_yylvalp->SEQ).type = REG_LAMBDA;
+
+		if (init_node(&(out->table))) exit(1);
+		if (init_node(&(out->table))) exit(1);
+		if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), out->table.node_cnt - 1)) exit(1);
+		(_yylvalp->SEQ).start = out->table.node_cnt - 2;
+		(_yylvalp->SEQ).end = out->table.node_cnt - 1;
+	
 					break;
 				}
 				default:
@@ -332,24 +459,19 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 					if (_yyreq(7, _yytid, _yytvl, _yybuffer + 0, out, scanner)) return 1;
 					if (_yyreq(6, _yytid, _yytvl, _yybuffer + 1, out, scanner)) return 1;
 
-		switch (((_yybuffer + 1)->ATOMMOD)) {
-			case MOD_NONE:
-				(_yylvalp->ATOM) = ((_yybuffer + 0)->NUCLEUS);
-				break;
-			case MOD_PLUS: {
-				reg* top = malloc(sizeof *top);
-				*top = ((_yybuffer + 0)->NUCLEUS);
-				(_yylvalp->ATOM).type = REG_PLUS;
-				(_yylvalp->ATOM).plus = top;
-				break;
+		if (((_yybuffer + 1)->ATOMMOD) == MOD_NONE) {
+			(_yylvalp->ATOM) = ((_yybuffer + 0)->NUCLEUS);
+		} else {
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->NUCLEUS).start)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->NUCLEUS).end]), out->table.node_cnt - 1)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->NUCLEUS).end]), ((_yybuffer + 0)->NUCLEUS).start)) exit(1);
+			if (((_yybuffer + 1)->ATOMMOD) == MOD_KLEENE) {
+				if (add_path(&(out->table.nodes[((_yybuffer + 0)->NUCLEUS).start]), ((_yybuffer + 0)->NUCLEUS).end)) exit(1);
 			}
-			case MOD_KLEENE: {
-				reg* top = malloc(sizeof *top);
-				*top = ((_yybuffer + 0)->NUCLEUS);
-				(_yylvalp->ATOM).type = REG_KLEENE;
-				(_yylvalp->ATOM).kleene = top;
-				break;
-			}
+			(_yylvalp->ATOM).start = out->table.node_cnt - 2;
+			(_yylvalp->ATOM).end = out->table.node_cnt - 1;
 		}
 	
 					break;
@@ -358,24 +480,19 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 					if (_yyreq(7, _yytid, _yytvl, _yybuffer + 0, out, scanner)) return 1;
 					if (_yyreq(6, _yytid, _yytvl, _yybuffer + 1, out, scanner)) return 1;
 
-		switch (((_yybuffer + 1)->ATOMMOD)) {
-			case MOD_NONE:
-				(_yylvalp->ATOM) = ((_yybuffer + 0)->NUCLEUS);
-				break;
-			case MOD_PLUS: {
-				reg* top = malloc(sizeof *top);
-				*top = ((_yybuffer + 0)->NUCLEUS);
-				(_yylvalp->ATOM).type = REG_PLUS;
-				(_yylvalp->ATOM).plus = top;
-				break;
+		if (((_yybuffer + 1)->ATOMMOD) == MOD_NONE) {
+			(_yylvalp->ATOM) = ((_yybuffer + 0)->NUCLEUS);
+		} else {
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->NUCLEUS).start)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->NUCLEUS).end]), out->table.node_cnt - 1)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->NUCLEUS).end]), ((_yybuffer + 0)->NUCLEUS).start)) exit(1);
+			if (((_yybuffer + 1)->ATOMMOD) == MOD_KLEENE) {
+				if (add_path(&(out->table.nodes[((_yybuffer + 0)->NUCLEUS).start]), ((_yybuffer + 0)->NUCLEUS).end)) exit(1);
 			}
-			case MOD_KLEENE: {
-				reg* top = malloc(sizeof *top);
-				*top = ((_yybuffer + 0)->NUCLEUS);
-				(_yylvalp->ATOM).type = REG_KLEENE;
-				(_yylvalp->ATOM).kleene = top;
-				break;
-			}
+			(_yylvalp->ATOM).start = out->table.node_cnt - 2;
+			(_yylvalp->ATOM).end = out->table.node_cnt - 1;
 		}
 	
 					break;
@@ -384,24 +501,19 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 					if (_yyreq(7, _yytid, _yytvl, _yybuffer + 0, out, scanner)) return 1;
 					if (_yyreq(6, _yytid, _yytvl, _yybuffer + 1, out, scanner)) return 1;
 
-		switch (((_yybuffer + 1)->ATOMMOD)) {
-			case MOD_NONE:
-				(_yylvalp->ATOM) = ((_yybuffer + 0)->NUCLEUS);
-				break;
-			case MOD_PLUS: {
-				reg* top = malloc(sizeof *top);
-				*top = ((_yybuffer + 0)->NUCLEUS);
-				(_yylvalp->ATOM).type = REG_PLUS;
-				(_yylvalp->ATOM).plus = top;
-				break;
+		if (((_yybuffer + 1)->ATOMMOD) == MOD_NONE) {
+			(_yylvalp->ATOM) = ((_yybuffer + 0)->NUCLEUS);
+		} else {
+			if (init_node(&(out->table))) exit(1);
+			if (init_node(&(out->table))) exit(1);
+			if (add_path(&(out->table.nodes[out->table.node_cnt - 2]), ((_yybuffer + 0)->NUCLEUS).start)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->NUCLEUS).end]), out->table.node_cnt - 1)) exit(1);
+			if (add_path(&(out->table.nodes[((_yybuffer + 0)->NUCLEUS).end]), ((_yybuffer + 0)->NUCLEUS).start)) exit(1);
+			if (((_yybuffer + 1)->ATOMMOD) == MOD_KLEENE) {
+				if (add_path(&(out->table.nodes[((_yybuffer + 0)->NUCLEUS).start]), ((_yybuffer + 0)->NUCLEUS).end)) exit(1);
 			}
-			case MOD_KLEENE: {
-				reg* top = malloc(sizeof *top);
-				*top = ((_yybuffer + 0)->NUCLEUS);
-				(_yylvalp->ATOM).type = REG_KLEENE;
-				(_yylvalp->ATOM).kleene = top;
-				break;
-			}
+			(_yylvalp->ATOM).start = out->table.node_cnt - 2;
+			(_yylvalp->ATOM).end = out->table.node_cnt - 1;
 		}
 	
 					break;
@@ -488,17 +600,18 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 					}
 					if (_yyreq(8, _yytid, _yytvl, _yybuffer + 1, out, scanner)) return 1;
 
-		switch (((_yybuffer + 1)->CHARRNG).type) {
-			case RNG_NONE:
-				(_yylvalp->NUCLEUS).type = REG_CHAR;
-				(_yylvalp->NUCLEUS).c = ((_yybuffer + 0)->chara);
-				break;
-			case RNG_TOP:
-				(_yylvalp->NUCLEUS).type = REG_RANGE;
-				(_yylvalp->NUCLEUS).c1 = ((_yybuffer + 0)->chara);
-				(_yylvalp->NUCLEUS).c2 = ((_yybuffer + 1)->CHARRNG).top;
-				break;
+		if (init_node(&(out->table))) exit(1);
+		if (init_node(&(out->table))) exit(1);
+		if (((_yybuffer + 1)->CHARRNG).type == RNG_NONE) {
+			out->table.nodes[out->table.node_cnt - 2].tran[(unsigned char)((_yybuffer + 0)->chara)] = out->table.node_cnt - 1;
+		} else {
+			if ((unsigned char)((_yybuffer + 0)->chara) > (unsigned char)(((_yybuffer + 1)->CHARRNG).top)) exit(1);
+			for (size_t i = (unsigned char)((_yybuffer + 0)->chara); i <= (unsigned char)(((_yybuffer + 1)->CHARRNG).top); ++i) {
+				out->table.nodes[out->table.node_cnt - 2].tran[i] = out->table.node_cnt - 1;
+			}
 		}
+		(_yylvalp->NUCLEUS).start = out->table.node_cnt - 2;
+		(_yylvalp->NUCLEUS).end = out->table.node_cnt - 1;
 	
 					break;
 				}
@@ -509,7 +622,15 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 					} else {
 						return 1;
 					}
-(_yylvalp->NUCLEUS).type = REG_DOT;
+
+		if (init_node(&(out->table))) exit(1);
+		if (init_node(&(out->table))) exit(1);
+		for (size_t i = 0; i < (1 << CHAR_BIT); ++i) {
+			out->table.nodes[out->table.node_cnt - 2].tran[i] = out->table.node_cnt - 1;
+		}
+		(_yylvalp->NUCLEUS).start = out->table.node_cnt - 2;
+		(_yylvalp->NUCLEUS).end = out->table.node_cnt - 1;
+	
 					break;
 				}
 				default:
@@ -579,7 +700,7 @@ static int _yyreq(unsigned int _yyid, unsigned int* _yytid, YYSTYPE* _yytvl, YYS
 	return 0;
 }
 
-int yyparse(reg* out, void* scanner) {
+int yyparse(reg_nfa* out, void* scanner) {
 	YYSTYPE _yylval;
 	YYSTYPE _yytvl;
 	unsigned int _yytid = _yytran(yylex(&_yytvl, out, scanner));

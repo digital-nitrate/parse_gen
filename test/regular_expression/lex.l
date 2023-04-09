@@ -8,17 +8,17 @@
 
 	typedef union YYSTYPE {
 		char chara;
-		reg ALT;
+		reg_in ALT;
 		struct reg_link* ALTLIST;
-		reg SEQ;
+		reg_in SEQ;
 		struct reg_link* SEQLIST;
-		reg ATOM;
+		reg_in ATOM;
 		enum atommod_type ATOMMOD;
-		reg NUCLEUS;
+		reg_in NUCLEUS;
 		struct charrng CHARRNG;
 	} YYSTYPE;
 
-	#define YY_DECL int yylex(YYSTYPE* yylvalp, reg* out, yyscan_t yyscanner)
+	#define YY_DECL int yylex(YYSTYPE* yylvalp, reg_nfa* out, yyscan_t yyscanner)
 }
 
 %%
@@ -37,63 +37,64 @@
 
 %%
 
-static void write_reg(FILE* restrict out, reg const* restrict r) {
-	switch (r->type) {
-		case REG_LAMBDA:
-			break;
-		case REG_CHAR:
-			fputc(r->c, out);
-			break;
-		case REG_RANGE:
-			fprintf(out, "%c-%c", r->c1, r->c2);
-			break;
-		case REG_DOT:
-			fputc('.', out);
-			break;
-		case REG_KLEENE:
-			fputc('(', out);
-			write_reg(out, r->kleene);
-			fputs(")*", out);
-			break;
-		case REG_PLUS:
-			fputc('(', out);
-			write_reg(out, r->plus);
-			fputs(")*", out);
-			break;
-		case REG_SEQ: {
-			struct reg_link const* curr = r->seq;
-			while (curr != NULL) {
-				fputc('(', out);
-				write_reg(out, &(curr->sub));
-				fputc(')', out);
-				curr = curr->next;
-			}
-			break;
-		}
-		case REG_ALT: {
-			struct reg_link const* curr = r->alt;
-			fputc('(', out);
-			write_reg(out, &(curr->sub));
-			fputc(')', out);
-			curr = curr->next;
-			while (curr != NULL) {
-				fputs("|(", out);
-				write_reg(out, &(curr->sub));
-				fputc(')', out);
-				curr = curr->next;
-			}
-			break;
-		}
+static void write_reg(FILE* restrict out, reg_nfa const* restrict r) {
+	_Bool* table = malloc((sizeof *table) * r->table.node_cnt);
+	fputs("+----++", out);
+	for (size_t i = 0; i < (1 << CHAR_BIT); ++i) fputs("-----+", out);
+	fputs("\n|  T ||", out);
+	for (size_t i = 0; i < (1 << CHAR_BIT); ++i) {
+		if (i >= 32 && i <= 126) fprintf(out, "  %c  |", (char)i);
+		else fprintf(out, "<%3zu>|", i);
 	}
+	fputs("\n+----++", out);
+	for (size_t i = 0; i < (1 << CHAR_BIT); ++i) fputs("-----+", out);
+	fputs("\n+----++", out);
+	for (size_t i = 0; i < (1 << CHAR_BIT); ++i) fputs("-----+", out);
+	for (size_t i = 0; i < r->table.node_cnt; ++i) {
+		fprintf(out, "\n|%c%3zu||", r->specials.end == i ? '+' : (r->specials.start == i ? 'S' : ' '), i);
+		for (size_t j = 0; j < (1 << CHAR_BIT); ++j) {
+			if (r->table.nodes[i].tran[j] == UINT_MAX) {
+				fprintf(out, "  E  |");
+			} else {
+				fprintf(out, " %3u |", r->table.nodes[i].tran[j]);
+			}
+		}
+		fputs("\n+----++", out);
+		for (size_t i = 0; i < (1 << CHAR_BIT); ++i) fputs("-----+", out);
+	}
+	fputs("\n\n+----++", out);
+	for (size_t i = 0; i < r->table.node_cnt; ++i) fputs("----+", out);
+	fputs("\n|  L ||", out);
+	for (size_t i = 0; i < r->table.node_cnt; ++i) {
+		fprintf(out, "%c%3zu|", r->specials.end == i ? '+' : (r->specials.start == i ? 'S' : ' '), i);
+	}
+	fputs("\n+----++", out);
+	for (size_t i = 0; i < r->table.node_cnt; ++i) fputs("----+", out);
+	fputs("\n+----++", out);
+	for (size_t i = 0; i < r->table.node_cnt; ++i) fputs("----+", out);
+	for (size_t i = 0; i < r->table.node_cnt; ++i) {
+		for (size_t j = 0; j < r->table.node_cnt; ++j) table[j] = 0;
+		for (size_t j = 0; j < r->table.nodes[i].lambda.cnt; ++j) table[r->table.nodes[i].lambda.paths[j]] = 1;
+		fprintf(out, "\n|%c%3zu||", r->specials.end == i ? '+' : (r->specials.start == i ? 'S' : ' '), i);
+		for (size_t j = 0; j < r->table.node_cnt; ++j) {
+			fprintf(out, "  %c |", table[j] ? '*' : ' ');
+		}
+		fputs("\n+----++", out);
+		for (size_t i = 0; i < r->table.node_cnt; ++i) fputs("----+", out);
+	}
+	fputc('\n', out);
 }
 
-extern int yyparse(reg* out, yyscan_t scanner);
+extern int yyparse(reg_nfa* out, yyscan_t scanner);
 
 int main(void) {
 	yyscan_t scanner;
 	yylex_init(&scanner);
 	yyset_in(stdin, scanner);
-	reg out;
+	reg_nfa out;
+	out.table.nodes = malloc((sizeof *(out.table.nodes)) * 16);
+	out.table.node_cnt = 0;
+	out.table.node_cap = 16;
 	int res = yyparse(&out, scanner);
 	yylex_destroy(scanner);
 	if (res == 0) {
