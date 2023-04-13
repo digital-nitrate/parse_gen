@@ -6,11 +6,15 @@ SRC:=src
 OBJ:=obj
 GEN:=gen
 
+ifeq ($(origin CC), undefined)
 CC:=clang
-CFLAGS:=-Werror -Wall -Wextra -std=gnu17 -I$(SRC) -I$(GEN) -fPIC -flto -Ofast $(D)
+endif
+
+CFLAGS:=-Werror -Wall -Wextra -std=gnu99 -I$(SRC) -I$(GEN) -fPIC -flto -Ofast $(D)
+BCFLAGS:=-Wno-strict-aliasing
 LDFLAGS:=-flto -fPIE -Ofast
 RELEASE_FLAGS:=-g0 -fno-asynchronous-unwind-tables -fno-unwind-tables
-DEBUG_FLAGS:=-fsanitize=address -fsanitize=undefined -g
+DEBUG_FLAGS:=-g -DDEBUG_BUILD
 
 rwildcard=$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
@@ -39,13 +43,13 @@ cmd_rm_name=printf '  %-6s %s\n' "RM" "$(1)"
 cmd_rm=rm -rf $(1)
 
 cmd_cc_rl_name=printf '  %-6s %s -> %s\n' "CC" "$(1)" "$(2)"
-cmd_cc_rl=mkdir -p $(dir $(2)); $(CC) $(CFLAGS) $(RELEASE_FLAGS) -c $(1) -o $(2)
+cmd_cc_rl=mkdir -p $(dir $(2)); $(CC) $(CFLAGS) $(RELEASE_FLAGS) $(3) -c $(1) -o $(2)
 
 cmd_ld_rl_name=printf '  %-6s %s -> %s\n' "LD" "$(1)" "$(2)"
 cmd_ld_rl=$(CC) $(LDFLAGS) $(RELEASE_FLAGS) $(1) -o $(2)
 
 cmd_cc_db_name=printf '  %-6s %s -> %s\n' "CC" "$(1)" "$(2)"
-cmd_cc_db=mkdir -p $(dir $(2)); $(CC) $(CFLAGS) $(DEBUG_FLAGS) -c $(1) -o $(2)
+cmd_cc_db=mkdir -p $(dir $(2)); $(CC) $(CFLAGS) $(DEBUG_FLAGS) $(3) -c $(1) -o $(2)
 
 cmd_ld_db_name=printf '  %-6s %s -> %s\n' "LD" "$(1)" "$(2)"
 cmd_ld_db=$(CC) $(LDFLAGS) $(DEBUG_FLAGS) $(1) -o $(2)
@@ -71,7 +75,7 @@ $(TARGET): $(O_FILE)
 	$(call cmd,ld_rl,$^,$@)
 
 $(OBJ)/$(GEN)/%.o: $(GEN)/%.c $(YC_FILE) $(LC_FILE) | $(OBJ)
-	$(call cmd,cc_rl,$<,$@)
+	$(call cmd,cc_rl,$<,$@,$(BCFLAGS))
 
 $(OBJ)/%.o: $(SRC)/%.c $(YC_FILE) $(LC_FILE) | $(OBJ)
 	$(call cmd,cc_rl,$<,$@)
@@ -86,7 +90,7 @@ $(TARGET).debug: $(O_FILE_D)
 	$(call cmd,ld_db,$^,$@)
 
 $(OBJ)/$(GEN)/%.debug.o: $(GEN)/%.c $(YC_FILE) $(LC_FILE) | $(OBJ)
-	$(call cmd,cc_db,$<,$@)
+	$(call cmd,cc_db,$<,$@,$(BCFLAGS))
 
 $(OBJ)/%.debug.o: $(SRC)/%.c $(YC_FILE) $(LC_FILE) | $(OBJ)
 	$(call cmd,cc_db,$<,$@)

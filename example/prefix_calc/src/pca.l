@@ -3,7 +3,7 @@
 %option nounput noinput nodefault noyywrap
 
 %top{
-	#include "reg_par.h"
+	#include "pca_parse.h"
 	#define YY_DECL int yylex(YYSTYPE* yylvalp, void* yyscanner)
 	extern YY_DECL;
 }

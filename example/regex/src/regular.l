@@ -4,7 +4,7 @@
 
 %top {
 	#include "regular.h"
-	#include "reg_parse.h"
+	#include "regex_parse.h"
 	#define YY_DECL int yylex(YYSTYPE* yylvalp, void* yyscanner)
 	extern YY_DECL;
 }
