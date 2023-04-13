@@ -3,11 +3,14 @@
 
 #include <stdio.h>
 
-#include "util.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct gen_loc {
+	int first_line;
+	int last_line;
+} gen_loc;
 
 typedef struct gen_sid {
 	unsigned int error:1, term:1, ind:30;
@@ -25,22 +28,22 @@ typedef struct gen_rarr {
 } gen_rarr;
 
 typedef struct gen_tok {
-	struct string name;
-	struct string type;
+	char* name;
+	char* type;
 	gen_rarr rh;
 	unsigned int id;
 } gen_tok;
 
 typedef struct gen_ntm {
-	struct string name;
-	struct string type;
+	char* name;
+	char* type;
 	gen_rarr rh;
 	gen_rarr lh;
 } gen_ntm;
 
 typedef struct gen_param {
-	struct string type;
-	struct string name;
+	char* type;
+	char* name;
 } gen_param;
 
 enum gen_code_type {
@@ -53,7 +56,7 @@ typedef struct gen_act {
 	struct gen_act* next;
 	union {
 		unsigned int index;
-		struct string data;
+		char* data;
 	};
 	enum gen_code_type type;
 } gen_act;
@@ -66,34 +69,47 @@ typedef struct gen_slist {
 
 typedef struct gen_rule {
 	gen_act* act;
+	gen_loc act_loc;
 	gen_slist rhs;
 	gen_sid lhs;
 } gen_rule;
 
 typedef struct gen_type {
-	struct string* prologue;
 	gen_tok* tokens;
 	gen_ntm* nterms;
-	gen_param* params;
+	gen_param* pparams;
+	gen_param* lparams;
 	gen_rule* rules;
-	struct string prefix;
-	struct string epilogue;
-	size_t prologue_cnt;
-	size_t prologue_cap;
+	char const* fname;
+	char* top;
+	char* req;
+	char* prov;
+	char* code;
+	char* prefixlo;
+	char* prefixhi;
+	char* epilogue;
+	gen_loc top_loc;
+	gen_loc req_loc;
+	gen_loc prov_loc;
+	gen_loc code_loc;
+	gen_loc epilogue_loc;
 	size_t token_cnt;
 	size_t token_cap;
 	size_t nterm_cnt;
 	size_t nterm_cap;
-	size_t param_cnt;
-	size_t param_cap;
+	size_t pparam_cnt;
+	size_t pparam_cap;
+	size_t lparam_cnt;
+	size_t lparam_cap;
 	size_t rule_cnt;
 	size_t rule_cap;
 	gen_sid start;
 } gen_type;
 
-extern int gen_bld(FILE* restrict, gen_type* restrict);
+extern int gen_bld(char const* restrict, gen_type* restrict);
 extern unsigned int* gen_bld_ll1(gen_type const*);
-extern void gen_wrt_ll1(gen_type const* restrict, unsigned int const* restrict, FILE* restrict);
+extern int gen_wrt_ll1(gen_type const* restrict, unsigned int const* restrict, char const* restrict);
+extern int gen_wrt_ll1_h(gen_type const* restrict, char const* restrict);
 extern void gen_fini(gen_type*);
 
 #ifdef __cplusplus

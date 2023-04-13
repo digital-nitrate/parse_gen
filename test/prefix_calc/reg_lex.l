@@ -3,10 +3,9 @@
 %option nounput noinput nodefault noyywrap
 
 %top{
-	typedef union YYSTYPE {
-		double NUM;
-	} YYSTYPE;
-	#define YY_DECL int yylex(YYSTYPE* yylvalp, yyscan_t yyscanner)
+	#include "reg_par.h"
+	#define YY_DECL int yylex(YYSTYPE* yylvalp, void* yyscanner)
+	extern YY_DECL;
 }
 
 %%
@@ -14,17 +13,17 @@
 [ \t\r]+ {}
 [0-9]+\.[0-9]* {
 	yylvalp->NUM = atof(yytext);
-	return 257;
+	return NUM;
 }
-\+ {return 258;}
-- {return 259;}
-\* {return 260;}
-\/ {return 261;}
-\^ {return 262;}
-n {return 263;}
-\n {return 264;}
-<<EOF>> {return -1;}
-. {return -2;}
+\+ {return ADD;}
+- {return SUB;}
+\* {return MUL;}
+\/ {return DIV;}
+\^ {return POW;}
+n {return NEG;}
+\n {return NL;}
+<<EOF>> {return YYEOF;}
+. {return YYUNDEF;}
 
 %%
 

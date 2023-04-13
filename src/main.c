@@ -5,29 +5,20 @@
 
 int main(int argc, char** argv) {
 	int status = EXIT_FAILURE;
-	if (argc != 3) {
-		fputs("unexpected number of arguments -- expected 3\nusage: parse_gen <srcfile> <outfile>\n", stderr);
+	if (argc != 3 && argc != 4) {
+		fputs("unexpected number of arguments -- expected 3\nusage: parse_gen <srcfile> <outfile> <headerfile>?\n", stderr);
 		goto Finish;
-	}
-	FILE* input = fopen(argv[1], "rb");
-	if (input == NULL) {
-		fprintf(stderr, "could not open \"%s\"\n", argv[1]);
-		goto Finish;
-	}
-	FILE* output = fopen(argv[2], "wb");
-	if (output == NULL) {
-		fprintf(stderr, "could not open \"%s\"\n", argv[2]);
-		goto CleanInput;
 	}
 	gen_type gen;
-	if (gen_bld(input, &gen)) goto CleanOutput;
+	if (gen_bld(argv[1], &gen)) goto Finish;
 	unsigned int* ll1 = gen_bld_ll1(&gen);
 	if (ll1 == NULL) goto CleanGen;
-	gen_wrt_ll1(&gen, ll1, output);
+	if (gen_wrt_ll1(&gen, ll1, argv[2])) goto CleanGen;
+	if (argc == 4) {
+		if (gen_wrt_ll1_h(&gen, argv[3])) goto CleanGen;
+	}
 	status = EXIT_SUCCESS;
 	free(ll1);
 	CleanGen: gen_fini(&gen);
-	CleanOutput: fclose(output);
-	CleanInput: fclose(input);
 	Finish: return status;
 }

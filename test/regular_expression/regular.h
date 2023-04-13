@@ -1,5 +1,5 @@
 #ifndef REGULAR_H
-#define REFULAR_H 1
+#define REGULAR_H 1
 
 #include <limits.h>
 #include <stddef.h>

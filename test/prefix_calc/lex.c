@@ -1,21 +1,9 @@
-	
-	#include "regular.h"
+#line 2 "lex.c"
+	#include "reg_par.h"
+	#define YY_DECL int yylex(YYSTYPE* yylvalp, void* yyscanner)
+	extern YY_DECL;
 
-	typedef union YYSTYPE {
-		char chara;
-		reg_in ALT;
-		struct reg_link* ALTLIST;
-		reg_in SEQ;
-		struct reg_link* SEQLIST;
-		reg_in ATOM;
-		enum atommod_type ATOMMOD;
-		reg_in NUCLEUS;
-		struct charrng CHARRNG;
-	} YYSTYPE;
-
-	#define YY_DECL int yylex(YYSTYPE* yylvalp, reg_nfa* out, yyscan_t yyscanner)
-
-#line 19 "lex.yy.c"
+#line 7 "lex.c"
 
 #define  YY_INT_ALIGNED short int
 
@@ -363,59 +351,60 @@ struct yy_trans_info
 	flex_int32_t yy_verify;
 	flex_int32_t yy_nxt;
 	};
-static const flex_int16_t yy_accept[15] =
+static const flex_int16_t yy_accept[19] =
     {   0,
-        0,    0,   12,   10,    9,    4,    5,    2,    3,    8,
-        7,    6,    1,    0
+        0,    0,   12,   10,    1,    9,    5,    3,    4,    6,
+       10,    7,    8,    1,    2,    0,    2,    0
     } ;
 
 static const YY_CHAR yy_ec[128] =
     {   0,
-        1,    1,    1,    1,    1,    1,    1,    1,    1,    2,
+        1,    1,    1,    1,    1,    1,    1,    1,    2,    3,
+        1,    1,    2,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
-        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
-        1,    1,    1,    1,    1,    1,    1,    1,    1,    3,
-        4,    5,    6,    1,    7,    8,    1,    9,    9,    9,
+        1,    2,    1,    1,    1,    1,    1,    1,    1,    1,
+        1,    4,    5,    1,    6,    7,    8,    9,    9,    9,
         9,    9,    9,    9,    9,    9,    9,    1,    1,    1,
-        1,    1,    1,    1,    9,    9,    9,    9,    9,    9,
-        9,    9,    9,    9,    9,    9,    9,    9,    9,    9,
-        9,    9,    9,    9,    9,    9,    9,    9,    9,    9,
-        1,    1,    1,    1,    1,    1,    9,    9,    9,    9,
+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+        1,    1,    1,   10,    1,    1,    1,    1,    1,    1,
 
-        9,    9,    9,    9,    9,    9,    9,    9,    9,    9,
-        9,    9,    9,    9,    9,    9,    9,    9,    9,    9,
-        9,    9,    1,   10,    1,    1,    1
+        1,    1,    1,    1,    1,    1,    1,    1,    1,   11,
+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+        1,    1,    1,    1,    1,    1,    1
     } ;
 
-static const YY_CHAR yy_meta[11] =
-    {   0,
-        1,    1,    1,    1,    1,    1,    1,    1,    1,    1
-    } ;
-
-static const flex_int16_t yy_base[15] =
-    {   0,
-        0,    0,   11,   12,   12,   12,   12,   12,   12,   12,
-       12,   12,   12,   12
-    } ;
-
-static const flex_int16_t yy_def[15] =
-    {   0,
-       14,    1,   14,   14,   14,   14,   14,   14,   14,   14,
-       14,   14,   14,    0
-    } ;
-
-static const flex_int16_t yy_nxt[23] =
-    {   0,
-        4,    5,    6,    7,    8,    9,   10,   11,   12,   13,
-       14,    3,   14,   14,   14,   14,   14,   14,   14,   14,
-       14,   14
-    } ;
-
-static const flex_int16_t yy_chk[23] =
+static const YY_CHAR yy_meta[12] =
     {   0,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
-        3,   14,   14,   14,   14,   14,   14,   14,   14,   14,
-       14,   14
+        1
+    } ;
+
+static const flex_int16_t yy_base[19] =
+    {   0,
+        0,    0,   18,   19,   15,   19,   19,   19,   19,   19,
+        5,   19,   19,   14,    6,    0,    4,   19
+    } ;
+
+static const flex_int16_t yy_def[19] =
+    {   0,
+       18,    1,   18,   18,   18,   18,   18,   18,   18,   18,
+       18,   18,   18,   18,   18,   11,   18,    0
+    } ;
+
+static const flex_int16_t yy_nxt[31] =
+    {   0,
+        4,    5,    6,    7,    8,    9,    4,   10,   11,   12,
+       13,   15,   17,   16,   17,   14,   14,   18,    3,   18,
+       18,   18,   18,   18,   18,   18,   18,   18,   18,   18
+    } ;
+
+static const flex_int16_t yy_chk[31] =
+    {   0,
+        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+        1,   11,   17,   11,   15,   14,    5,    3,   18,   18,
+       18,   18,   18,   18,   18,   18,   18,   18,   18,   18
     } ;
 
 /* The intent behind this definition is that it'll catch
@@ -425,10 +414,10 @@ static const flex_int16_t yy_chk[23] =
 #define yymore() yymore_used_but_not_detected
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
-#line 1 "lex.l"
+#line 1 "reg_lex.l"
 #define YY_NO_INPUT 1
 
-#line 432 "lex.yy.c"
+#line 421 "lex.c"
 
 #define INITIAL 0
 
@@ -686,10 +675,10 @@ YY_DECL
 		}
 
 	{
-#line 24 "lex.l"
+#line 11 "reg_lex.l"
 
 
-#line 693 "lex.yy.c"
+#line 682 "lex.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -716,13 +705,13 @@ yy_match:
 			while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 				{
 				yy_current_state = (int) yy_def[yy_current_state];
-				if ( yy_current_state >= 15 )
+				if ( yy_current_state >= 19 )
 					yy_c = yy_meta[yy_c];
 				}
 			yy_current_state = yy_nxt[yy_base[yy_current_state] + yy_c];
 			++yy_cp;
 			}
-		while ( yy_base[yy_current_state] != 12 );
+		while ( yy_base[yy_current_state] != 19 );
 
 yy_find_action:
 		yy_act = yy_accept[yy_current_state];
@@ -748,65 +737,68 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 26 "lex.l"
-{return 1;}
+#line 13 "reg_lex.l"
+{}
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 27 "lex.l"
-{return 2;}
+#line 14 "reg_lex.l"
+{
+	yylvalp->NUM = atof(yytext);
+	return NUM;
+}
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 28 "lex.l"
-{return 3;}
+#line 18 "reg_lex.l"
+{return ADD;}
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 29 "lex.l"
-{return 4;}
+#line 19 "reg_lex.l"
+{return SUB;}
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 30 "lex.l"
-{return 5;}
+#line 20 "reg_lex.l"
+{return MUL;}
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 31 "lex.l"
-{yylvalp->chara = *yytext; return 6;}
+#line 21 "reg_lex.l"
+{return DIV;}
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 32 "lex.l"
-{return 7;}
+#line 22 "reg_lex.l"
+{return POW;}
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 33 "lex.l"
-{return 8;}
-	YY_BREAK
-case YY_STATE_EOF(INITIAL):
-#line 34 "lex.l"
-{return -1;}
+#line 23 "reg_lex.l"
+{return NEG;}
 	YY_BREAK
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 35 "lex.l"
-{return -1;}
+#line 24 "reg_lex.l"
+{return NL;}
+	YY_BREAK
+case YY_STATE_EOF(INITIAL):
+#line 25 "reg_lex.l"
+{return YYEOF;}
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 36 "lex.l"
-{return -2;}
+#line 26 "reg_lex.l"
+{return YYUNDEF;}
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 38 "lex.l"
+#line 28 "reg_lex.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 810 "lex.yy.c"
+#line 802 "lex.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -1103,7 +1095,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 		while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 			{
 			yy_current_state = (int) yy_def[yy_current_state];
-			if ( yy_current_state >= 15 )
+			if ( yy_current_state >= 19 )
 				yy_c = yy_meta[yy_c];
 			}
 		yy_current_state = yy_nxt[yy_base[yy_current_state] + yy_c];
@@ -1132,11 +1124,11 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 	while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 		{
 		yy_current_state = (int) yy_def[yy_current_state];
-		if ( yy_current_state >= 15 )
+		if ( yy_current_state >= 19 )
 			yy_c = yy_meta[yy_c];
 		}
 	yy_current_state = yy_nxt[yy_base[yy_current_state] + yy_c];
-	yy_is_jam = (yy_current_state == 14);
+	yy_is_jam = (yy_current_state == 18);
 
 	(void)yyg;
 	return yy_is_jam ? 0 : yy_current_state;
@@ -1935,73 +1927,17 @@ void yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 38 "lex.l"
+#line 28 "reg_lex.l"
 
 
-static void write_reg(FILE* restrict out, reg_nfa const* restrict r) {
-	_Bool* table = malloc((sizeof *table) * r->table.node_cnt);
-	fputs("+----++", out);
-	for (size_t i = 0; i < (1 << CHAR_BIT); ++i) fputs("-----+", out);
-	fputs("\n|  T ||", out);
-	for (size_t i = 0; i < (1 << CHAR_BIT); ++i) {
-		if (i >= 32 && i <= 126) fprintf(out, "  %c  |", (char)i);
-		else fprintf(out, "<%3zu>|", i);
-	}
-	fputs("\n+----++", out);
-	for (size_t i = 0; i < (1 << CHAR_BIT); ++i) fputs("-----+", out);
-	fputs("\n+----++", out);
-	for (size_t i = 0; i < (1 << CHAR_BIT); ++i) fputs("-----+", out);
-	for (size_t i = 0; i < r->table.node_cnt; ++i) {
-		fprintf(out, "\n|%c%3zu||", r->specials.end == i ? '+' : (r->specials.start == i ? 'S' : ' '), i);
-		for (size_t j = 0; j < (1 << CHAR_BIT); ++j) {
-			if (r->table.nodes[i].tran[j] == UINT_MAX) {
-				fprintf(out, "  E  |");
-			} else {
-				fprintf(out, " %3u |", r->table.nodes[i].tran[j]);
-			}
-		}
-		fputs("\n+----++", out);
-		for (size_t i = 0; i < (1 << CHAR_BIT); ++i) fputs("-----+", out);
-	}
-	fputs("\n\n+----++", out);
-	for (size_t i = 0; i < r->table.node_cnt; ++i) fputs("----+", out);
-	fputs("\n|  L ||", out);
-	for (size_t i = 0; i < r->table.node_cnt; ++i) {
-		fprintf(out, "%c%3zu|", r->specials.end == i ? '+' : (r->specials.start == i ? 'S' : ' '), i);
-	}
-	fputs("\n+----++", out);
-	for (size_t i = 0; i < r->table.node_cnt; ++i) fputs("----+", out);
-	fputs("\n+----++", out);
-	for (size_t i = 0; i < r->table.node_cnt; ++i) fputs("----+", out);
-	for (size_t i = 0; i < r->table.node_cnt; ++i) {
-		for (size_t j = 0; j < r->table.node_cnt; ++j) table[j] = 0;
-		for (size_t j = 0; j < r->table.nodes[i].lambda.cnt; ++j) table[r->table.nodes[i].lambda.paths[j]] = 1;
-		fprintf(out, "\n|%c%3zu||", r->specials.end == i ? '+' : (r->specials.start == i ? 'S' : ' '), i);
-		for (size_t j = 0; j < r->table.node_cnt; ++j) {
-			fprintf(out, "  %c |", table[j] ? '*' : ' ');
-		}
-		fputs("\n+----++", out);
-		for (size_t i = 0; i < r->table.node_cnt; ++i) fputs("----+", out);
-	}
-	fputc('\n', out);
-}
-
-extern int yyparse(reg_nfa* out, yyscan_t scanner);
+extern int yyparse(yyscan_t scanner);
 
 int main(void) {
 	yyscan_t scanner;
 	yylex_init(&scanner);
 	yyset_in(stdin, scanner);
-	reg_nfa out;
-	out.table.nodes = malloc((sizeof *(out.table.nodes)) * 16);
-	out.table.node_cnt = 0;
-	out.table.node_cap = 16;
-	int res = yyparse(&out, scanner);
+	int res = yyparse(scanner);
 	yylex_destroy(scanner);
-	if (res == 0) {
-		write_reg(stdout, &out);
-		fputc('\n', stdout);
-	}
 	return res;
 }
 

@@ -68,28 +68,28 @@ clean:
 	$(call cmd,rm,$(TARGET) $(TARGET).debug $(OBJ) $(GEN))
 
 $(TARGET): $(O_FILE)
-	$(call cmd,ld_rl,$(O_FILE),$(TARGET))
+	$(call cmd,ld_rl,$^,$@)
 
-$(OBJ)/$(GEN)/%.o: $(GEN)/%.c | $(OBJ) $(YC_FILE) $(LC_FILE)
-	$(call cmd,cc_rl,$^,$@)
+$(OBJ)/$(GEN)/%.o: $(GEN)/%.c $(YC_FILE) $(LC_FILE) | $(OBJ)
+	$(call cmd,cc_rl,$<,$@)
 
-$(OBJ)/%.o: $(SRC)/%.c | $(OBJ) $(YC_FILE) $(LC_FILE)
-	$(call cmd,cc_rl,$^,$@)
+$(OBJ)/%.o: $(SRC)/%.c $(YC_FILE) $(LC_FILE) | $(OBJ)
+	$(call cmd,cc_rl,$<,$@)
 
 $(GEN)/%.tab.c: $(SRC)/%.y | $(GEN)
-	$(call cmd,bs,$^,$(GEN)/$*.tab.c,$(GEN)/$*.tab.h)
+	$(call cmd,bs,$<,$(GEN)/$*.tab.c,$(GEN)/$*.tab.h)
 
 $(GEN)/%.yy.c: $(SRC)/%.l | $(GEN)
-	$(call cmd,fl,$^,$(GEN)/$*.yy.c,$(GEN)/$*.yy.h)
+	$(call cmd,fl,$<,$(GEN)/$*.yy.c,$(GEN)/$*.yy.h)
 
 $(TARGET).debug: $(O_FILE_D)
 	$(call cmd,ld_db,$^,$@)
 
-$(OBJ)/$(GEN)/%.debug.o: $(GEN)/%.c | $(OBJ) $(YC_FILE) $(LC_FILE)
-	$(call cmd,cc_db,$^,$@)
+$(OBJ)/$(GEN)/%.debug.o: $(GEN)/%.c $(YC_FILE) $(LC_FILE) | $(OBJ)
+	$(call cmd,cc_db,$<,$@)
 
-$(OBJ)/%.debug.o: $(SRC)/%.c | $(OBJ) $(YC_FILE) $(LC_FILE)
-	$(call cmd,cc_db,$^,$@)
+$(OBJ)/%.debug.o: $(SRC)/%.c $(YC_FILE) $(LC_FILE) | $(OBJ)
+	$(call cmd,cc_db,$<,$@)
 
 $(OBJ):
 	@mkdir -p $@

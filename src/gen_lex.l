@@ -20,82 +20,79 @@
 
 %%
 
-<INITIAL,rules>[ \t\r\n]+ {}
-<INITIAL,rules>\/\*([^\*]|\*[^\/])*\*\/ {}
-<INITIAL>%\{(\}|%*([^%\/\"\'\}]|\/\*([^*]|\*[^\/])*\*\/|\"([^\"\\]|\\(.|\n))*\"|\'([^\'\\]|\\(.|\n))*\'))*%\} {
-	char* data = malloc(yyleng - 4);
-	if (data == NULL) return LEXERR;
-	memcpy(data, yytext + 2, yyleng - 4);
-	yylval_param->PROBLOCK = (struct string){.data=data,.len=yyleng-4,.cap=yyleng-4};
-	return PROBLOCK;
-}
-<INITIAL,rules>[a-zA-Z][a-zA-Z0-9_]* {
-	char* data = malloc(yyleng);
-	if (data == NULL) return LEXERR;
-	memcpy(data, yytext, yyleng);
-	yylval_param->IDEN = (struct string){.data=data,.len=yyleng,.cap=yyleng};
-	return IDEN;
-}
-<INITIAL>\<[^>]*\> {
-	char* data = malloc(yyleng - 2);
-	if (data == NULL) return LEXERR;
-	memcpy(data, yytext + 1, yyleng - 2);
-	yylval_param->TYPESPEC = (struct string){.data=data,.len=yyleng-2,.cap=yyleng-2};
-	return TYPESPEC;
-}
+<INITIAL>\n {return NL;}
+<rules>: {return COL;}
+<rules>\| {return MID;}
+<rules>; {return SCL;}
+<INITIAL>\/token {return TOKENDECL;}
+<INITIAL>\/nterm {return NTERMDECL;}
+<INITIAL>\/start {return STARTDECL;}
+<INITIAL>\/prefix {return PREFIXDECL;}
+<INITIAL>\/parseparam {return PPARAMDECL;}
+<INITIAL>\/lexparam {return LPARAMDECL;}
+<INITIAL>\/codetop {return CODETOPDECL;}
+<INITIAL>\/coderequires {return CODEREQDECL;}
+<INITIAL>\/codeprovides {return CODEPROVDECL;}
+<INITIAL>\/code {return CODEDECL;}
+<rules>\/empty {return EMPTYDECL;}
+<INITIAL>%% {BEGIN(rules);return SECSEP;}
+<rules>%% {BEGIN(end);return SECSEP;}
+<rules>\/\{ {BEGIN(code);return LBR;}
+<code>\/\} {BEGIN(rules);return RBR;}
 <INITIAL>[0-9]+ {
 	unsigned int value = 0;
 	for (int i = 0; i < yyleng; ++i) value = 10 * value + (yytext[i] - '0');
 	yylval_param->UINT = value;
 	return UINT;
 }
-<INITIAL>\. {return DOT;}
-<INITIAL>%token {return TOKENDECL;}
-<INITIAL>%nterm {return NTERMDECL;}
-<INITIAL>%start {return STARTDECL;}
-<INITIAL>%define {return DEFINEDECL;}
-<INITIAL>%param {return PARAMDECL;}
-<INITIAL>%% {
-	BEGIN(rules);	
-	return SECSEP;
+<INITIAL,rules>[a-zA-Z][a-zA-Z0-9_]* {
+	char* data = malloc(yyleng + 1);
+	if (data == NULL) return LEXERR;
+	memcpy(data, yytext, yyleng);
+	data[yyleng] = '\0';
+	yylval_param->IDEN = data;
+	return IDEN;
 }
-<rules>%empty {return EMPTYDECL;}
-<rules>: {return COL;}
-<rules>\| {return MID;}
-<rules>; {return SCL;}
-<rules>%\{ {
-	BEGIN(code);
-	return LBR;
+<INITIAL>\<[^>\n]*\> {
+	char* data = malloc(yyleng - 1);
+	if (data == NULL) return LEXERR;
+	memcpy(data, yytext + 1, yyleng - 2);
+	data[yyleng - 1] = '\0';
+	yylval_param->TYPESPEC = data;
+	return TYPESPEC;
 }
-<rules>%% {
-	BEGIN(end);
-	return SECSEP;
+<INITIAL>\/\{(\*|\}|\/*([^\*\/\"\'\}]|\/\*([^\*]|\*+[^\*\/])*\*+\/|\"([^\"\\]|\\(.|\n))*\"|\'([^\'\\]|\\(.|\n))*\'))*\/\} {
+	char* data = malloc(yyleng - 3);
+	if (data == NULL) return LEXERR;
+	memcpy(data, yytext + 2, yyleng - 4);
+	data[yyleng - 3] = '\0';
+	yylval_param->CODEBLOCK = data;
+	return CODEBLOCK;
 }
-<code>\$\$ {
-	return SELFREF;
-}
-<code>\$[1-9][0-9]* {
+<code>\$[0-9]+ {
 	unsigned int value = 0;
 	for (int i = 1; i < yyleng; ++i) value = 10 * value + (yytext[i] - '0');
-	yylval_param->SUBREF = value - 1;
-	return SUBREF;
-}
-<code>(\}|(\/|%)*([^%\/\"\'\\}\$]|\/\*([^*]|\*[^\/])*\*\/|\"([^\"\\]|\\(.|\n))*\"|\'([^\'\\]|\\(.|\n))*\'))+ {
-	char* data = malloc(yyleng);
-	if (data == NULL) return LEXERR;
-	memcpy(data, yytext, yyleng);
-	yylval_param->RAW = (struct string){.data=data,.len=yyleng,.cap=yyleng,};
-	return RAW;
-}
-<code>%\} {
-	BEGIN(rules);
-	return RBR;
+	yylval_param->VALREF = value;
+	return VALREF;
 }
 <end>(.|\n)+ {
-	char* data = malloc(yyleng);
+	char* data = malloc(yyleng + 1);
 	if (data == NULL) return LEXERR;
 	memcpy(data, yytext, yyleng);
-	yylval_param->RAW = (struct string){.data=data,.len=yyleng,.cap=yyleng,};
+	data[yyleng] = '\0';
+	yylval_param->RAW = data;
 	return RAW;
 }
+<code>(\*|\}|\/*([^\*\/\"\'\$\}]|\/\*([^\*]|\*+[^\*\/])*\*+\/|\"([^\"\\]|\\(.|\n))*\"|\'([^\'\\]|\\(.|\n))*\'))* {
+	char* data = malloc(yyleng + 1);
+	if (data == NULL) return LEXERR;
+	memcpy(data, yytext, yyleng);
+	data[yyleng] = '\0';
+	yylval_param->RAW = data;
+	return RAW;
+}
+<INITIAL>[ \t]+ {}
+<rules>[ \t\n]+ {}
+<INITIAL,rules>\/\*([^\*]|\*+[^\*\/])*\*+\/ {}
+<INITIAL>\/[a-zA-Z][a-zA-Z0-9_]* {return LEXERR;}
 . {return LEXERR;}

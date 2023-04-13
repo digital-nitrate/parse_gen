@@ -10,13 +10,10 @@
 	#include <stdlib.h>
 	#include <limits.h>
 	#include <string.h>
+	#include <ctype.h>
 	#include "gen_lex.yy.h"
 	#include "generator.h"
 	#include "macros.h"
-	static char const api_str[] = "api";
-	static size_t const api_len = (sizeof api_str) - 1;
-	static char const prefix_str[] = "prefix";
-	static size_t const prefix_len = (sizeof prefix_str) - 1;
 	static void yyerror(YYLTYPE*, gen_type*, struct hash_table*, yyscan_t, char const*);
 	static int init_gen(gen_type*);
 }
@@ -33,15 +30,22 @@
 	hash_init(hash);
 }
 
-%token <struct string> PROBLOCK
+%token LEXERR
+%token NL
+%token SECSEP
 %token TOKENDECL
 %token NTERMDECL
 %token STARTDECL
-%token DEFINEDECL
-%token PARAMDECL
-%token DOT
-%token <struct string> IDEN
-%token <struct string> TYPESPEC
+%token PREFIXDECL
+%token PPARAMDECL
+%token LPARAMDECL
+%token CODETOPDECL
+%token CODEREQDECL
+%token CODEPROVDECL
+%token CODEDECL
+%token <char*> CODEBLOCK
+%token <char*> IDEN
+%token <char*> TYPESPEC
 %token <unsigned int> UINT
 %token EMPTYDECL
 %token COL
@@ -49,16 +53,13 @@
 %token SCL
 %token LBR
 %token RBR
-%token <struct string> RAW
-%token <unsigned int> SUBREF
-%token SELFREF
-%token SECSEP
-%token LEXERR
+%token <char*> RAW
+%token <unsigned int> VALREF
 
 %nterm program
 %nterm declaration
 %nterm decl
-%nterm <struct string> typeopt
+%nterm <char*> typeopt
 %nterm rules
 %nterm <struct {unsigned int low; unsigned int high;}> patterns
 %nterm <gen_slist> slist
@@ -67,8 +68,8 @@
 %nterm epilogue
 
 %destructor {
-	free($$.data);
-} PROBLOCK IDEN TYPESPEC RAW typeopt
+	free($$);
+} CODEBLOCK IDEN TYPESPEC RAW typeopt
 
 %destructor {
 	free($$.syms);
@@ -79,7 +80,7 @@
 	while (curr != NULL) {
 		gen_act* tmp = curr;
 		curr = tmp->next;
-		if (tmp->type == GEN_CODE_RAW) free(tmp->data.data);
+		if (tmp->type == GEN_CODE_RAW) free(tmp->data);
 		free(tmp);
 	}
 } actopt code
@@ -94,27 +95,57 @@ program:
 
 declaration:
 	%empty
-	| declaration decl
+	| declaration decl NL
 	;
 
 decl:
-	PROBLOCK {
-		int res = 0;
-		DYNARR_CHK(out->prologue_cnt, out->prologue_cap, out->prologue, res);
-		if (res) {
-			fputs("memory failure\n", stderr);
-			free($1.data);
+	%empty
+	| CODETOPDECL CODEBLOCK {
+		if (out->top != NULL) {
+			fputs("codetop already set\n", stderr);
+			free($2);
 			YYERROR;
 		}
-		out->prologue[out->prologue_cnt] = $1;
-		++(out->prologue_cnt);
+		out->top = $2;
+		out->top_loc.first_line = @2.first_line;
+		out->top_loc.last_line = @2.last_line;
+	}
+	| CODEREQDECL CODEBLOCK {
+		if (out->req != NULL) {
+			fputs("coderequires already set\n", stderr);
+			free($2);
+			YYERROR;
+		}
+		out->req = $2;
+		out->req_loc.first_line = @2.first_line;
+		out->req_loc.last_line = @2.last_line;
+	}
+	| CODEPROVDECL CODEBLOCK {
+		if (out->prov != NULL) {
+			fputs("codeprovides already set\n", stderr);
+			free($2);
+			YYERROR;
+		}
+		out->prov = $2;
+		out->prov_loc.first_line = @2.first_line;
+		out->prov_loc.last_line = @2.last_line;
+	}
+	| CODEDECL CODEBLOCK {
+		if (out->code != NULL) {
+			fputs("code already set\n", stderr);
+			free($2);
+			YYERROR;
+		}
+		out->code = $2;
+		out->code_loc.first_line = @2.first_line;
+		out->code_loc.last_line = @2.last_line;
 	}
 	| TOKENDECL typeopt IDEN UINT {
 		gen_ref* ar = malloc((sizeof *ar) * 16);
 		if (ar == NULL) {
 			fputs("memory failure\n", stderr);
-			free($2.data);
-			free($3.data);
+			free($2);
+			free($3);
 			YYERROR;
 		}
 		gen_sid sym = hash_add(out, hash, $3, 1);
@@ -125,8 +156,8 @@ decl:
 				fprintf(stderr, "%d:%d->%d:%d$ symbol already defined\n", @3.first_line, @3.first_column, @3.last_line, @3.last_column);
 			}
 			free(ar);
-			free($2.data);
-			free($3.data);
+			free($2);
+			free($3);
 			YYERROR;
 		}
 		out->tokens[sym.ind].type = $2;
@@ -137,16 +168,16 @@ decl:
 		gen_ref* ar = malloc((sizeof *ar) * 16);
 		if (ar == NULL) {
 			fputs("memory failure\n", stderr);
-			free($2.data);
-			free($3.data);
+			free($2);
+			free($3);
 			YYERROR;
 		}
 		gen_ref* al = malloc((sizeof *al) * 16);
 		if (al == NULL) {
 			fputs("memory failure\n", stderr);
 			free(ar);
-			free($2.data);
-			free($3.data);
+			free($2);
+			free($3);
 			YYERROR;
 		}
 		gen_sid sym = hash_add(out, hash, $3, 0);
@@ -158,8 +189,8 @@ decl:
 			}
 			free(al);
 			free(ar);
-			free($2.data);
-			free($3.data);
+			free($2);
+			free($3);
 			YYERROR;
 		}
 		out->nterms[sym.ind].type = $2;
@@ -169,11 +200,11 @@ decl:
 	| STARTDECL IDEN {
 		if (out->start.error == 0) {
 			fprintf(stderr, "%d:%d->%d:%d$ start already set\n", @1.first_line, @1.first_column, @1.last_line, @1.last_column);
-			free($2.data);
+			free($2);
 			YYERROR;
 		}
 		gen_sid sym = hash_ld(out, hash, $2);
-		free($2.data);
+		free($2);
 		if (sym.error) {
 			fprintf(stderr, "%d:%d->%d:%d$ no symbol found\n", @2.first_line, @2.first_column, @2.last_line, @2.last_column);
 			YYERROR;
@@ -184,35 +215,66 @@ decl:
 		}
 		out->start = sym;
 	}
-	| DEFINEDECL IDEN DOT IDEN IDEN {
-		if (out->prefix.data != NULL || $2.len != api_len || memcmp(api_str, $2.data, api_len) != 0 || $4.len != prefix_len || memcmp(prefix_str, $4.data, prefix_len) != 0) {
-			fprintf(stderr, "%d:%d->%d:%d$ unknown name\n", @2.first_line, @2.first_column, @4.last_line, @4.last_column);
-			free($2.data);
-			free($4.data);
-			free($5.data);
+	| PREFIXDECL IDEN {
+		if (out->prefixlo != NULL || out->prefixhi != NULL) {
+			fprintf(stderr, "%d:%d->%d:%d$ prefix already set\n", @1.first_line, @1.first_column, @2.last_line, @2.last_column);
+			free($2);
 			YYERROR;
 		}
-		free($2.data);
-		free($4.data);
-		out->prefix = $5;
+		size_t len = strlen($2);
+		char* lo = malloc(len + 1);
+		if (lo == NULL) {
+			fprintf(stderr, "memory failure\n");
+			free($2);
+			YYERROR;
+		}
+		char* hi = malloc(len + 1);
+		if (hi == NULL) {
+			fprintf(stderr, "memory failure\n");
+			free(lo);
+			free($2);
+			YYERROR;
+		}
+		for (size_t i = 0; i < len; ++i) {
+			lo[i] = tolower($2[i]);
+			hi[i] = toupper($2[i]);
+		}
+		free($2);
+		lo[len] = '\0';
+		hi[len] = '\0';
+		out->prefixlo = lo;
+		out->prefixhi = hi;
 	}
-	| PARAMDECL TYPESPEC IDEN {
+	| PPARAMDECL TYPESPEC IDEN {
 		int res = 0;
-		DYNARR_CHK(out->param_cnt, out->param_cap, out->params, res);
+		DYNARR_CHK(out->pparam_cnt, out->pparam_cap, out->pparams, res);
 		if (res) {
 			fprintf(stderr, "memory failure\n");
-			free($2.data);
-			free($3.data);
+			free($2);
+			free($3);
 			YYERROR;
 		}
-		out->params[out->param_cnt].type = $2;
-		out->params[out->param_cnt].name = $3;
-		++(out->param_cnt);
+		out->pparams[out->pparam_cnt].type = $2;
+		out->pparams[out->pparam_cnt].name = $3;
+		++(out->pparam_cnt);
+	}
+	| LPARAMDECL TYPESPEC IDEN {
+		int res = 0;
+		DYNARR_CHK(out->lparam_cnt, out->lparam_cap, out->lparams, res);
+		if (res) {
+			fprintf(stderr, "memory failure\n");
+			free($2);
+			free($3);
+			YYERROR;
+		}
+		out->lparams[out->lparam_cnt].type = $2;
+		out->lparams[out->lparam_cnt].name = $3;
+		++(out->lparam_cnt);
 	}
 	;
 
 typeopt:
-	%empty {$$ = (struct string){.data = NULL, .len = 0, .cap = 0};}
+	%empty {$$ = NULL;}
 	| TYPESPEC {$$ = $1;}
 	;
 
@@ -220,7 +282,7 @@ rules:
 	%empty
 	| rules IDEN COL patterns SCL {
 		gen_sid sym = hash_ld(out, hash, $2);
-		free($2.data);
+		free($2);
 		if (sym.error) {
 			fprintf(stderr, "%d:%d->%d:%d$ no symbol found\n", @2.first_line, @2.first_column, @2.last_line, @2.last_column);
 			YYERROR;
@@ -242,6 +304,7 @@ rules:
 			out->rules[i].lhs = sym;
 		}
 	}
+	;
 
 patterns:
 	slist actopt {
@@ -262,6 +325,8 @@ patterns:
 			++(r->cnt);
 		}
 		out->rules[out->rule_cnt].act = $2;
+		out->rules[out->rule_cnt].act_loc.first_line = @2.first_line;
+		out->rules[out->rule_cnt].act_loc.last_line = @2.last_line;
 		out->rules[out->rule_cnt].rhs = $1;
 		$$.low = out->rule_cnt;
 		$$.high = $$.low + 1;
@@ -285,11 +350,14 @@ patterns:
 			++(r->cnt);
 		}
 		out->rules[out->rule_cnt].act = $4;
+		out->rules[out->rule_cnt].act_loc.first_line = @4.first_line;
+		out->rules[out->rule_cnt].act_loc.last_line = @4.last_line;
 		out->rules[out->rule_cnt].rhs = $3;
 		$$.low = $1.low;
 		$$.high = $1.high + 1;
 		++(out->rule_cnt);
 	}
+	;
 
 slist:
 	%empty {
@@ -308,7 +376,7 @@ slist:
 	}
 	| slist IDEN {
 		gen_sid sym = hash_ld(out, hash, $2);
-		free($2.data);
+		free($2);
 		if (sym.error) {
 			fprintf(stderr, "%d:%d->%d:%d$ no symbol found\n", @2.first_line, @2.first_column, @2.last_line, @2.last_column);
 			YYERROR;
@@ -323,10 +391,12 @@ slist:
 		++($1.cnt);
 		$$ = $1;
 	}
+	;
 
 actopt:
 	%empty {$$ = NULL;}
 	| LBR code RBR {$$ = $2;}
+	;
 
 code:
 	%empty {$$ = NULL;}
@@ -338,25 +408,24 @@ code:
 		node->type = GEN_CODE_RAW;
 		$$ = node;
 	}
-	| SUBREF code {
+	| VALREF code {
 		gen_act* node = malloc(sizeof *node);
 		if (node == NULL){YYERROR;}
 		node->next = $2;
-		node->index = $1;
-		node->type = GEN_CODE_COMP;
+		if ($1 == 0) {
+			node->type = GEN_CODE_SELF;
+		} else {
+			node->index = $1 - 1;
+			node->type = GEN_CODE_COMP;
+		}
 		$$ = node;
 	}
-	| SELFREF code {
-		gen_act* node = malloc(sizeof *node);
-		if (node == NULL) {YYERROR;}
-		node->next = $2;
-		node->type = GEN_CODE_SELF;
-		$$ = node;
-	}
+	;
 
 epilogue:
 	%empty
-	| RAW {out->epilogue = $1;}
+	| RAW {out->epilogue = $1;out->epilogue_loc.first_line = @1.first_line;out->epilogue_loc.last_line = @1.last_line;}
+	;
 
 %%
 
@@ -368,38 +437,46 @@ void yyerror(YYLTYPE* locp, gen_type* out, struct hash_table* hash, yyscan_t sca
 }
 
 int init_gen(gen_type* gen) {
-	gen->prologue = malloc((sizeof *(gen->prologue)) * 16);
-	if (gen->prologue == NULL) goto Error;
 	gen->tokens = malloc((sizeof *(gen->tokens)) * 16);
-	if (gen->tokens == NULL) goto CleanPrologue;
+	if (gen->tokens == NULL) goto Error;
 	gen->nterms = malloc((sizeof *(gen->nterms)) * 16);
 	if (gen->nterms == NULL) goto CleanTokens;
-	gen->params = malloc((sizeof *(gen->params)) * 16);
-	if (gen->params == NULL) goto CleanNterms;
+	gen->pparams = malloc((sizeof *(gen->pparams)) * 16);
+	if (gen->pparams == NULL) goto CleanNterms;
+	gen->lparams = malloc((sizeof *(gen->lparams)) * 16);
+	if (gen->lparams == NULL) goto CleanPParams;
 	gen->rules = malloc((sizeof *(gen->rules)) * 16);
 	if (gen->rules == NULL) goto CleanParams;
-	gen->prologue_cnt = 0;
-	gen->prologue_cap = 16;
+	gen->top = NULL;
+	gen->req = NULL;
+	gen->prov = NULL;
+	gen->code = NULL;
 	gen->token_cnt = 0;
 	gen->token_cap = 16;
 	gen->nterm_cnt = 0;
 	gen->nterm_cap = 16;
-	gen->param_cnt = 0;
-	gen->param_cap = 16;
+	gen->pparam_cnt = 0;
+	gen->pparam_cap = 16;
+	gen->lparam_cnt = 0;
+	gen->lparam_cap = 16;
 	gen->rule_cnt = 0;
 	gen->rule_cap = 16;
-	gen->prefix.data = NULL;
-	gen->epilogue.data = NULL;
+	gen->prefixlo = NULL;
+	gen->prefixhi = NULL;
+	gen->epilogue = NULL;
 	gen->start.error = 1;
 	return 0;
-	CleanParams: free(gen->params);
+	CleanParams: free(gen->lparams);
+	CleanPParams: free(gen->pparams);
 	CleanNterms: free(gen->nterms);
 	CleanTokens: free(gen->tokens);
-	CleanPrologue: free(gen->prologue);
 	Error: return 1;
 }
 
-int gen_bld(FILE* restrict src, gen_type* restrict gen) {
+int gen_bld(char const* restrict srcpath, gen_type* restrict gen) {
+	FILE* src = fopen(srcpath, "rb");
+	if (src == NULL) return 1;
+	gen->fname = srcpath;
 	struct hash_table table;
 	yyscan_t scanner;
 	yylex_init(&scanner);
@@ -407,5 +484,6 @@ int gen_bld(FILE* restrict src, gen_type* restrict gen) {
 	int res = yyparse(gen, &table, scanner);
 	hash_fini(&table);
 	yylex_destroy(scanner);
+	fclose(src);
 	return res;
 }

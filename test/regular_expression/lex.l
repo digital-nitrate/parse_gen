@@ -3,37 +3,25 @@
 %option nounput noinput nodefault noyywrap
 
 %top {
-	
 	#include "regular.h"
-
-	typedef union YYSTYPE {
-		char chara;
-		reg_in ALT;
-		struct reg_link* ALTLIST;
-		reg_in SEQ;
-		struct reg_link* SEQLIST;
-		reg_in ATOM;
-		enum atommod_type ATOMMOD;
-		reg_in NUCLEUS;
-		struct charrng CHARRNG;
-	} YYSTYPE;
-
-	#define YY_DECL int yylex(YYSTYPE* yylvalp, reg_nfa* out, yyscan_t yyscanner)
+	#include "reg_parse.h"
+	#define YY_DECL int yylex(YYSTYPE* yylvalp, void* yyscanner)
+	extern YY_DECL;
 }
 
 %%
 
-\| {return 1;}
-\* {return 2;}
-\+ {return 3;}
-\( {return 4;}
-\) {return 5;}
-[a-zA-Z0-9] {yylvalp->chara = *yytext; return 6;}
-\. {return 7;}
-\- {return 8;}
-<<EOF>> {return -1;}
-\n {return -1;}
-. {return -2;}
+\| {return tokpipe;}
+\* {return tokkleene;}
+\+ {return tokplus;}
+\( {return tokopen;}
+\) {return tokclose;}
+[a-zA-Z0-9] {yylvalp->tokchar = *yytext; return tokchar;}
+\. {return tokdot;}
+\- {return tokdash;}
+<<EOF>> {return YYEOF;}
+\n {return YYEOF;}
+. {return YYUNDEF;}
 
 %%
 

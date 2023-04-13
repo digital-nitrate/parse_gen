@@ -63,7 +63,9 @@ unsigned int* gen_bld_ll1(gen_type const* gen) {
 			}
 			unsigned int tr = table[lhs.ind * (gen->token_cnt + 1) + t];
 			if (tr != UINT_MAX && tr != r.rules[i].rule) {
-				fprintf(stderr, "conflict for rules %u -- %u at (%u,%zu) {first set}\n", tr, r.rules[i].rule, lhs.ind, t);
+				unsigned int lo = tr < r.rules[i].rule ? tr : r.rules[i].rule;
+				fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%zu) {first set}; using %u\n", tr, r.rules[i].rule, lhs.ind, t, lo);
+				table[lhs.ind * (gen->token_cnt + 1) + t] = lo;
 			} else {
 				table[lhs.ind * (gen->token_cnt + 1) + t] = r.rules[i].rule;
 			}
@@ -80,7 +82,9 @@ unsigned int* gen_bld_ll1(gen_type const* gen) {
 				}
 				unsigned int tr = table[lhs.ind * (gen->token_cnt + 1) + t];
 				if (tr != UINT_MAX && tr != in.rules[i].rule) {
-					fprintf(stderr, "conflict for rules %u -- %u at (%u,%zu) {first set}\n", tr, in.rules[i].rule, lhs.ind, t);
+					unsigned int lo = tr < in.rules[i].rule ? tr : in.rules[i].rule;
+					fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%zu) {first set}; using %u\n", tr, in.rules[i].rule, lhs.ind, t, lo);
+					table[lhs.ind * (gen->token_cnt + 1) + t] = lo;
 				} else {
 					table[lhs.ind * (gen->token_cnt + 1) + t] = in.rules[i].rule;
 				}
@@ -96,7 +100,9 @@ unsigned int* gen_bld_ll1(gen_type const* gen) {
 				if (cntr == 0) {
 					unsigned int tr = table[rule->lhs.ind * (gen->token_cnt + 1) + t];
 					if (tr != UINT_MAX && tr != r.rules[i].rule) {
-						fprintf(stderr, "conflict for rules %u -- %u at (%u,%zu) {follow set}\n", tr, r.rules[i].rule, rule->lhs.ind, t);
+						unsigned int lo = tr < r.rules[i].rule ? tr : r.rules[i].rule;
+						fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%zu) {follow set}; using %u\n", tr, r.rules[i].rule, rule->lhs.ind, t, lo);
+						table[rule->lhs.ind * (gen->token_cnt + 1) + t] = lo;
 					} else {
 						table[rule->lhs.ind * (gen->token_cnt + 1) + t] = r.rules[i].rule;
 					}
@@ -126,7 +132,9 @@ unsigned int* gen_bld_ll1(gen_type const* gen) {
 					if (cntr == 0) {
 						unsigned int tr = table[rule->lhs.ind * (gen->token_cnt + 1) + t];
 						if (tr != UINT_MAX && tr != in.rules[i].rule) {
-							fprintf(stderr, "conflict for rules %u -- %u at (%u,%zu) {follow set}\n", tr, in.rules[i].rule, rule->lhs.ind, t);
+							unsigned int lo = tr < in.rules[i].rule ? tr : in.rules[i].rule;
+							fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%zu) {follow set}; using %u\n", tr, in.rules[i].rule, rule->lhs.ind, t, lo);
+							table[rule->lhs.ind * (gen->token_cnt + 1) + t] = lo;
 						} else {
 							table[rule->lhs.ind * (gen->token_cnt + 1) + t] = in.rules[i].rule;
 						}
@@ -156,7 +164,9 @@ unsigned int* gen_bld_ll1(gen_type const* gen) {
 					if (cntr == 0) {
 						unsigned int tr = table[rule->lhs.ind * (gen->token_cnt + 1) + t];
 						if (tr != UINT_MAX && tr != in.rules[i].rule) {
-							fprintf(stderr, "conflict for rules %u -- %u at (%u,%zu) {follow set}\n", tr, in.rules[i].rule, rule->lhs.ind, t);
+							unsigned int lo = tr < in.rules[i].rule ? tr : in.rules[i].rule;
+							fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%zu) {follow set}; using %u\n", tr, in.rules[i].rule, rule->lhs.ind, t, lo);
+							table[rule->lhs.ind * (gen->token_cnt + 1) + t] = lo;
 						} else {
 							table[rule->lhs.ind * (gen->token_cnt + 1) + t] = in.rules[i].rule;
 						}
@@ -195,7 +205,9 @@ unsigned int* gen_bld_ll1(gen_type const* gen) {
 				if (cntr == 0) {
 					unsigned int tr = table[rule->lhs.ind * (gen->token_cnt + 1) + gen->token_cnt];
 					if (tr != UINT_MAX && tr != in.rules[i].rule) {
-						fprintf(stderr, "conflict for rules %u -- %u at (%u,%zu) {follow set}\n", tr, in.rules[i].rule, rule->lhs.ind, gen->token_cnt);
+						unsigned int lo = tr < in.rules[i].rule ? tr : in.rules[i].rule;
+						fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%zu) {follow set}; using %u\n", tr, in.rules[i].rule, rule->lhs.ind, gen->token_cnt, lo);
+						table[rule->lhs.ind * (gen->token_cnt + 1) + gen->token_cnt] = lo;
 					} else {
 						table[rule->lhs.ind * (gen->token_cnt + 1) + gen->token_cnt] = in.rules[i].rule;
 					}
