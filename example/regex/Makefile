@@ -20,20 +20,17 @@ TARGET:=regex
 
 all: $(TARGET)
 
-$(TARGET): $(OBJ)/regex_parse.o $(OBJ)/regex_lex.o
+$(TARGET): $(OBJ)/regex_parse.o $(OBJ)/regular_lex.o
 	$(CC) $(LDFLAGS) $(RELEASE_FLAGS) $^ -o $@
 
-$(OBJ)/regex_parse.o: $(GEN)/regex_parse.c $(GEN)/regex_lex.c | $(OBJ)
+$(OBJ)/regex_parse.o: $(GEN)/regex_parse.c | $(OBJ)
 	$(CC) $(CFLAGS) $(RELEASE_FLAGS) -c $< -o $@
 
-$(OBJ)/regex_lex.o: $(GEN)/regex_lex.c $(GEN)/regex_parse.c | $(OBJ)
+$(OBJ)/regular_lex.o: $(SRC)/regular_lex.c | $(OBJ)
 	$(CC) $(CFLAGS) $(RELEASE_FLAGS) -c $< -o $@
 
 $(GEN)/regex_parse.c: $(SRC)/regular.cfg | $(GEN)
 	../../parse_gen $(SRC)/regular.cfg $(GEN)/regex_parse.c $(GEN)/regex_parse.h
-
-$(GEN)/regex_lex.c: $(SRC)/regular.l | $(GEN)
-	flex -F -o $(GEN)/regex_lex.c --header-file=$(GEN)/regex_lex.h $(SRC)/regular.l
 
 clean:
 	rm -rf $(TARGET) $(GEN) $(OBJ)
