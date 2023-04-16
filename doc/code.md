@@ -53,10 +53,10 @@ During the nonterminal construction, calls to `yylex` are made without a generat
 
 ## Links
 
-[Top](docs/top.md)
+[Top](top.md)
 
-[README](docs/README.md)
+[README](README.md)
 
-[Generated Code](docs/code.md)
+[Generated Code](code.md)
 
-[Grammar File Format](docs/grammar.md)
+[Grammar File Format](grammar.md)
