@@ -53,7 +53,7 @@
 	yylval_param->IDEN = data;
 	return IDEN;
 }
-<INITIAL>\<[^>\n]*\> {
+<INITIAL>\<[^\>\n]*\> {
 	char* data = malloc(yyleng - 1);
 	if (data == NULL) return LEXERR;
 	memcpy(data, yytext + 1, yyleng - 2);

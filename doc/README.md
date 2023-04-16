@@ -6,7 +6,7 @@
 It takes 2 arguments for the source file and the output c file along with an optional 3rd argument specifing an output c header file.
 The source file is in a syntax similar to `bison`/`yacc` however there are key differences as this application shall **not** accept bison grammar files and vis versa.
 These differences include (*but are not exclusive to*) different prefixes for commands as well as a reduced command set.
-Specification of the proper input file is documented here **TODO**.
+Specification of the proper input file format is documented [here](doc/grammar.md).
 
 Once the output c file is generated, one may compile this file with any complying c compiler along with any other files used in compilation.
 The outputeed file shall include a definition for a parser taking configured arguments and running symantic actions based upon the passed grammar.
@@ -56,4 +56,4 @@ Be sure that `parse_gen` is built in the project root directory before attemptin
 
 ### Documentation
 
-Full documentation for `parse_gen` can be found here **TODO**.
+Full documentation for `parse_gen` can be found [here](docs/top.md).
