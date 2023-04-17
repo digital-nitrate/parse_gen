@@ -1,0 +1,6 @@
+**.o
+**.swp
+
+/obj/
+/gen/
+/prefix_calc

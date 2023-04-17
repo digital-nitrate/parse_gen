@@ -1,0 +1,6 @@
+**.o
+**.swp
+
+/obj/
+/lrread
+/lrread.debug

@@ -1,7 +1,7 @@
-*.o
+**.o
+**.swp
 
 /obj/
 /gen/
 /parse_gen
-
-*.swp
+/parse_gen.debug
