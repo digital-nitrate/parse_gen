@@ -2,24 +2,35 @@
 
 #include "lr.h"
 
-int main(void) {
-	lr_tab tab;
-	if (read_lr(stdin, &tab)) return 1;
-	fprintf(stdout, "Row: %u\nCol: %u\nData:\n", tab.row_cnt, tab.col_cnt);
-	for (size_t i = 0; i < tab.row_cnt; ++i) {
-		for (size_t j = 0; j < tab.col_cnt; ++j) {
-			fprintf(stdout, "(%zu,%zu) -> ", i, j);
-			lr_entry ent = tab.data[i * tab.col_cnt + j];
-			if (ent.end && !ent.reduce) {
-				fputs("Error\n", stdout);
-			} else if (ent.end && ent.reduce) {
-				fprintf(stdout, "Accept Reduce %u\n", ent.loc);
-			} else if (!ent.end && !ent.reduce) {
-				fprintf(stdout, "Shift %u\n", ent.loc);
-			} else if (!ent.end && ent.reduce) {
-				fprintf(stdout, "Reduce %u\n", ent.loc);
-			}
-		}
+int main(int argc, char** argv) {
+	if (argc != 4) {
+		fputs("usage: lr_parse <cfg> <lr> <tok>\n", stderr);
+		return 1;
 	}
+	FILE* cfg_in = fopen(argv[1], "rb");
+	if (cfg_in == NULL) {
+		fprintf(stderr, "could not open \"%s\"\n", argv[1]);
+		return 1;
+	}
+	gr_ty gram;
+	int res = read_gr(cfg_in, &gram);
+	fclose(cfg_in);
+	if (res) return 1;
+	FILE* lr_in = fopen(argv[2], "rb");
+	if (lr_in == NULL) {
+		fprintf(stderr, "could not open \"%s\"\n", argv[2]);
+		return 1;
+	}
+	lr_tab tab;
+	res = read_lr(lr_in, &tab, &gram);
+	fclose(lr_in);
+	if (res) return 1;
+	FILE* tok_in = fopen(argv[3], "rb");
+	if (tok_in == NULL) {
+		fprintf(stderr, "could not open \"%s\"\n", argv[3]);
+		return 1;
+	}
+	parse_lr(tok_in, &tab, &gram);
+	fclose(tok_in);
 	return 0;
 }

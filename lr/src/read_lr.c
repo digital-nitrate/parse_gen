@@ -1,20 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <limits.h>
 
 #include "lr.h"
-
-#define DYNARR_CHK(cnt,cap,arr,res) do {\
-	if ((cnt) == (cap)) {\
-		size_t nc = (cap) * 2;\
-		void* np = realloc((arr), (sizeof *(arr)) * nc);\
-		if (np == NULL) {\
-			(res) = 1;\
-		} else {\
-			(cap) = nc;\
-			(arr) = np;\
-		}\
-	}\
-} while (0)
 
 enum tok_type {
 	TOKDOT,
@@ -32,6 +20,7 @@ enum tok_type {
 
 union tok_data {
 	unsigned int num;
+	char* name;
 };
 
 struct lexer {
@@ -44,9 +33,21 @@ static enum tok_type lex(struct lexer* restrict l, union tok_data* restrict data
 	if (l->fln == 0) {
 		if (l->save == ',') {l->save = fgetc(l->src);return TOKCOMMA;}
 		if ((l->save >= 'a' && l->save <= 'z') || (l->save >= 'A' && l->save <= 'Z')) {
-			do {
+			char* buffer = malloc(16);
+			size_t curr = 0;
+			size_t cap = 16;
+			int res = 0;
+			while ((l->save >= 'a' && l->save <= 'z') || (l->save >= 'A' && l->save <= 'Z')) {
+				DYNARR_CHK(curr, cap, buffer, res);
+				if (res) return 1;
+				buffer[curr] = l->save;
+				++curr;
 				l->save = fgetc(l->src);
-			} while ((l->save >= 'a' && l->save <= 'z') || (l->save >= 'A' && l->save <= 'Z'));	
+			}
+			DYNARR_CHK(curr, cap, buffer, res);
+			if (res) return 1;
+			buffer[curr] = '\0';
+			data->name = buffer;
 			return TOKNAME;
 		}
 		if (l->save == '\n') {l->fln = 1;l->save = fgetc(l->src);return TOKNL;}
@@ -115,7 +116,10 @@ static enum tok_type lex(struct lexer* restrict l, union tok_data* restrict data
 	return TOKERR;
 }
 
-int read_lr(FILE* restrict src, lr_tab* restrict tab) {
+int read_lr(FILE* restrict src, lr_tab* restrict tab, gr_ty const* restrict gram) {
+	unsigned int* map = malloc((sizeof *map) * (gram->e_cnt - 1));
+	if (map == NULL) return 1;
+	for (size_t i = 0; i < gram->e_cnt - 1; ++i) map[i] = UINT_MAX;
 	struct lexer l = {.src=src,.save=fgetc(src),.fln=0};
 	union tok_data data;
 	enum tok_type tok = lex(&l, &data);
@@ -123,33 +127,48 @@ int read_lr(FILE* restrict src, lr_tab* restrict tab) {
 		fputs("expected TOKDOT\n", stderr);
 		return 1;
 	}
-	tab->col_cnt = 0;
-	while (1) {
+	for (size_t i = 0; i < gram->e_cnt - 1; ++i) {
 		tok = lex(&l, &data);
-		if (tok == TOKNL) break;
 		if (tok != TOKCOMMA) {
 			fputs("expected TOKCOMMA\n", stderr);
 			return 1;
 		}
 		tok = lex(&l, &data);
 		if (tok != TOKNAME && tok != TOKEND) {
-			fputs("expected TOKNAME or TOKEND\n", stderr);
+			fputs("expected TOKNAME\n", stderr);
 			return 1;
 		}
-		++(tab->col_cnt);
+		unsigned int cd;
+		if (tok == TOKNAME) {
+			cd = sym_ld(gram, data.name);
+			free(data.name);
+		} else {
+			cd = sym_ld(gram, "");
+		}
+		if (cd == UINT_MAX) {
+			fputs("unknown symbol\n", stderr);
+			return 1;
+		}
+		if (map[i] != UINT_MAX) {
+			fputs("symbol already set\n", stderr);
+			return 1;
+		}
+		map[i] = cd;
 	}
-	if (tab->col_cnt == 0) {
-		fputs("needs at least one column\n", stderr);
+	tok = lex(&l, &data);
+	if (tok != TOKNL) {
+		fputs("expected TOKNL\n", stderr);
 		return 1;
 	}
-	lr_entry* dat = malloc((sizeof *dat) * tab->col_cnt * 16);
+	lr_entry* dat = malloc((sizeof *dat) * gram->e_cnt * 16);
 	if (dat == NULL) {
 		fputs("memory failure\n", stderr);
 		return 1;
 	}
-	size_t cap = tab->col_cnt * 16;
+	size_t cap = gram->e_cnt * 16;
 	size_t cnt = 0;
 	int res = 0;
+	tab->row_cnt = 0;
 	while (1) {
 		DYNARR_CHK(cnt,cap,dat,res);
 		if (res) {
@@ -162,7 +181,7 @@ int read_lr(FILE* restrict src, lr_tab* restrict tab) {
 			fputs("expected correct TOKUINT\n", stderr);
 			return 1;
 		}
-		for (size_t i = 0; i < tab->col_cnt; ++i) {
+		for (size_t i = 0; i < gram->e_cnt - 1; ++i) {
 			if (tok != TOKCOMMA) {
 				tok = lex(&l, &data);
 				if (tok != TOKCOMMA) {
@@ -171,14 +190,14 @@ int read_lr(FILE* restrict src, lr_tab* restrict tab) {
 				}
 			}
 			tok = lex(&l, &data);
-			if ((i == tab->col_cnt - 1) ? (tok == TOKNL || tok == TOKEOF) : (tok == TOKCOMMA)) {
-				dat[cnt + i] = (lr_entry){.end=1,.reduce=0};
+			if ((i == gram->e_cnt - 2) ? (tok == TOKNL || tok == TOKEOF) : (tok == TOKCOMMA)) {
+				dat[cnt + map[i]] = (lr_entry){.end=1,.reduce=0};
 			} else if (tok == TOKSHIFT) {
-				dat[cnt + i] = (lr_entry){.end=0,.reduce=0,.loc=data.num};
+				dat[cnt + map[i]] = (lr_entry){.end=0,.reduce=0,.loc=data.num};
 			} else if (tok == TOKREDUCE) {
-				dat[cnt + i] = (lr_entry){.end=0,.reduce=1,.loc=data.num};
+				dat[cnt + map[i]] = (lr_entry){.end=0,.reduce=1,.loc=data.num - 1};
 			} else if (tok == TOKSREDUCE) {
-				dat[cnt + i] = (lr_entry){.end=1,.reduce=1,.loc=data.num};
+				dat[cnt + map[i]] = (lr_entry){.end=1,.reduce=1,.loc=data.num - 1};
 			} else {
 				fputs("expected TOKSHIFT or TOKREDUCE or TOKSREDUCE\n", stderr);
 				return 1;
@@ -191,7 +210,7 @@ int read_lr(FILE* restrict src, lr_tab* restrict tab) {
 				return 1;
 			}
 		}
-		cnt += tab->col_cnt;
+		cnt += gram->e_cnt;
 		++(tab->row_cnt);
 	}
 	tab->data = dat;

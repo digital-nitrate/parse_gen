@@ -21,7 +21,7 @@ C_FILE:=$(strip $(call rwildcard,$(SRC),*.c))
 O_FILE:=$(patsubst $(SRC)/%.c,$(OBJ)/%.o,$(C_FILE))
 O_FILE_D:=$(patsubst %.o,%.debug.o,$(O_FILE))
 
-TARGET:=lrread
+TARGET:=lr_parse
 
 ifeq ($(V),)
 cmd=@$(call cmd_$(1)_name,$(2),$(3),$(4)); $(call cmd_$(1),$(2),$(3),$(4))
