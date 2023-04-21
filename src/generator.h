@@ -47,18 +47,22 @@ typedef struct gen_param {
 } gen_param;
 
 enum gen_code_type {
-	GEN_CODE_SELF,
 	GEN_CODE_COMP,
 	GEN_CODE_RAW,
 };
 
-typedef struct gen_act {
-	struct gen_act* next;
+struct gen_code_unit {
 	union {
 		unsigned int index;
 		char* data;
 	};
 	enum gen_code_type type;
+};
+
+typedef struct gen_act {
+	struct gen_code_unit* acts;
+	size_t len;
+	size_t cap;
 } gen_act;
 
 typedef struct gen_slist {
@@ -68,7 +72,7 @@ typedef struct gen_slist {
 } gen_slist;
 
 typedef struct gen_rule {
-	gen_act* act;
+	gen_act act;
 	gen_loc act_loc;
 	gen_slist rhs;
 	gen_sid lhs;
@@ -81,10 +85,10 @@ typedef struct gen_type {
 	gen_param* lparams;
 	gen_rule* rules;
 	char const* fname;
-	char* top;
-	char* req;
-	char* prov;
-	char* code;
+	gen_act top;
+	gen_act req;
+	gen_act prov;
+	gen_act code;
 	char* prefixlo;
 	char* prefixhi;
 	char* epilogue;

@@ -22,11 +22,21 @@ int gen_wrt_ll1_h(gen_type const* restrict gen, char const* restrict outpath) {
 	fprintf(out, "\t%sEOF = 0,\n"
 		"\t%sUNDEF = -1\n"
 		"};\n", prehi, prehi);
-	if (gen->req != NULL) {
+	if (gen->req.acts != NULL) {
 		curr_line += 3 + gen->req_loc.last_line - gen->req_loc.first_line;
-		fprintf(out, "#line %d \"%s\"\n"
-			"%s\n"
-			"#line %d \"%s\"\n", gen->req_loc.first_line, gen->fname, gen->req, curr_line, outpath);
+		fprintf(out, "#line %d \"%s\"\n", gen->req_loc.first_line, gen->fname);
+		struct gen_code_unit const* end = gen->req.acts + gen->req.len;
+		for (struct gen_code_unit const* curr = gen->req.acts; curr != end; ++curr) {
+			switch (curr->type) {
+				case GEN_CODE_COMP:
+					break;
+				case GEN_CODE_RAW:
+					fputs(curr->data, out);
+					break;
+			}
+		}
+		fprintf(out, "\n"
+			"#line %d \"%s\"\n", curr_line, outpath);
 	}
 	++curr_line;
 	fprintf(out, "typedef union %sSTYPE {\n", prehi);
@@ -44,11 +54,21 @@ int gen_wrt_ll1_h(gen_type const* restrict gen, char const* restrict outpath) {
 	}
 	++curr_line;
 	fprintf(out, "} %sSTYPE;\n", prehi);
-	if (gen->prov != NULL) {
+	if (gen->prov.acts != NULL) {
 		curr_line += 3 + gen->prov_loc.last_line - gen->prov_loc.first_line;
-		fprintf(out, "#line %d \"%s\"\n"
-			"%s\n"
-			"#line %d \"%s\"\n", gen->prov_loc.first_line, gen->fname, gen->prov, curr_line, outpath);
+		fprintf(out, "#line %d \"%s\"\n", gen->prov_loc.first_line, gen->fname);
+		struct gen_code_unit const* end = gen->prov.acts + gen->prov.len;
+		for (struct gen_code_unit const* curr = gen->prov.acts; curr != end; ++curr) {
+			switch (curr->type) {
+				case GEN_CODE_COMP:
+					break;
+				case GEN_CODE_RAW:
+					fputs(curr->data, out);
+					break;
+			}
+		}
+		fprintf(out, "\n"
+			"#line %d \"%s\"\n", curr_line, outpath);
 	}
 	++curr_line;
 	fputs("#endif\n", out);
@@ -62,11 +82,21 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 	int curr_line = 1;
 	char const* prelo = gen->prefixlo == NULL ? defprelo : gen->prefixlo;
 	char const* prehi = gen->prefixhi == NULL ? defprehi : gen->prefixhi;
-	if (gen->top != NULL) {
+	if (gen->top.acts != NULL) {
 		curr_line += 3 + gen->top_loc.last_line - gen->top_loc.first_line;
-		fprintf(out, "#line %d \"%s\"\n"
-			"%s\n"
-			"#line %d \"%s\"\n", gen->top_loc.first_line, gen->fname, gen->top, curr_line, outpath);
+		fprintf(out, "#line %d \"%s\"\n", gen->top_loc.first_line, gen->fname);
+		struct gen_code_unit const* end = gen->top.acts + gen->top.len;
+		for (struct gen_code_unit const* curr = gen->top.acts; curr != end; ++curr) {
+			switch (curr->type) {
+				case GEN_CODE_COMP:
+					break;
+				case GEN_CODE_RAW:
+					fputs(curr->data, out);
+					break;
+			}
+		}
+		fprintf(out, "\n"
+			"#line %d \"%s\"\n", curr_line, outpath);
 	}
 	curr_line += 6 + gen->token_cnt;
 	fprintf(out, "#ifndef %sPLL_H\n"
@@ -78,11 +108,21 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 	fprintf(out, "\t%sEOF = 0,\n"
 		"\t%sUNDEF = -1\n"
 		"};\n", prehi, prehi);
-	if (gen->req != NULL) {
+	if (gen->req.acts != NULL) {
 		curr_line += 3 + gen->req_loc.last_line - gen->req_loc.first_line;
-		fprintf(out, "#line %d \"%s\"\n"
-			"%s\n"
-			"#line %d \"%s\"\n", gen->req_loc.first_line, gen->fname, gen->req, curr_line, outpath);
+		fprintf(out, "#line %d \"%s\"\n", gen->req_loc.first_line, gen->fname);
+		struct gen_code_unit const* end = gen->req.acts + gen->req.len;
+		for (struct gen_code_unit const* curr = gen->req.acts; curr != end; ++curr) {
+			switch (curr->type) {
+				case GEN_CODE_COMP:
+					break;
+				case GEN_CODE_RAW:
+					fputs(curr->data, out);
+					break;
+			}
+		}
+		fprintf(out, "\n"
+			"#line %d \"%s\"\n", curr_line, outpath);
 	}
 	++curr_line;
 	fprintf(out, "typedef union %sSTYPE {\n", prehi);
@@ -100,19 +140,39 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 	}
 	++curr_line;
 	fprintf(out, "} %sSTYPE;\n", prehi);
-	if (gen->prov != NULL) {
+	if (gen->prov.acts != NULL) {
 		curr_line += 3 + gen->prov_loc.last_line - gen->prov_loc.first_line;
-		fprintf(out, "#line %d \"%s\"\n"
-			"%s\n"
-			"#line %d \"%s\"\n", gen->prov_loc.first_line, gen->fname, gen->prov, curr_line, outpath);
+		fprintf(out, "#line %d \"%s\"\n", gen->prov_loc.first_line, gen->fname);
+		struct gen_code_unit const* end = gen->prov.acts + gen->prov.len;
+		for (struct gen_code_unit const* curr = gen->prov.acts; curr != end; ++curr) {
+			switch (curr->type) {
+				case GEN_CODE_COMP:
+					break;
+				case GEN_CODE_RAW:
+					fputs(curr->data, out);
+					break;
+			}
+		}
+		fprintf(out, "\n"
+			"#line %d \"%s\"\n", curr_line, outpath);
 	}
 	++curr_line;
 	fputs("#endif\n", out);
-	if (gen->code != NULL) {
+	if (gen->code.acts != NULL) {
 		curr_line += 3 + gen->code_loc.last_line - gen->code_loc.first_line;
-		fprintf(out, "#line %d \"%s\"\n"
-			"%s\n"
-			"#line %d \"%s\"\n", gen->code_loc.first_line, gen->fname, gen->code, curr_line, outpath);
+		fprintf(out, "#line %d \"%s\"\n", gen->code_loc.first_line, gen->fname);
+		struct gen_code_unit const* end = gen->code.acts + gen->code.len;
+		for (struct gen_code_unit const* curr = gen->code.acts; curr != end; ++curr) {
+			switch (curr->type) {
+				case GEN_CODE_COMP:
+					break;
+				case GEN_CODE_RAW:
+					fputs(curr->data, out);
+					break;
+			}
+		}
+		fprintf(out, "\n"
+			"#line %d \"%s\"\n", curr_line, outpath);
 	}
 	curr_line += 79 + gen->token_cnt + gen->nterm_cnt;
 	fprintf(out, "static unsigned int _%stran(int code) {\n"
@@ -283,23 +343,23 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 				fputs(")) return 1;\n", out);
 			}
 		}
-		gen_act* curr = gen->rules[i].act;
 		curr_line += 5 + gen->rules[i].act_loc.last_line - gen->rules[i].act_loc.first_line;
 		fprintf(out, "#line %d \"%s\"\n", gen->rules[i].act_loc.first_line, gen->fname);
-		while (curr != NULL) {
+		struct gen_code_unit const* end = gen->rules[i].act.acts + gen->rules[i].act.len;
+		for (struct gen_code_unit const* curr = gen->rules[i].act.acts; curr != end; ++curr) {
 			switch (curr->type) {
-				case GEN_CODE_SELF:
-					fprintf(out, "(*(%s*)_%slvalp)", gen->nterms[gen->rules[i].lhs.ind].type, prelo);
-					break;
 				case GEN_CODE_COMP: {
-					fprintf(out, "(_%sv%u)", prelo, curr->index + 1);
+					if (curr->index == 0) {
+						fprintf(out, "(*(%s*)_%slvalp)", gen->nterms[gen->rules[i].lhs.ind].type, prelo);
+					} else {
+						fprintf(out, "(_%sv%u)", prelo, curr->index);
+					}
 					break;
 				}
 				case GEN_CODE_RAW:
 					fputs(curr->data, out);
 					break;
 			}
-			curr = curr->next;
 		}
 		fprintf(out, "\n"
 			"#line %d \"%s\"\n"

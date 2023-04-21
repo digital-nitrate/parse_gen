@@ -2,11 +2,25 @@
 
 #include "generator.h"
 
+static void free_act(gen_act* act) {
+	struct gen_code_unit const* end = act->acts + act->len;
+	for (struct gen_code_unit* curr = act->acts; curr != end; ++curr) {
+		switch (curr->type) {
+			case GEN_CODE_COMP:
+				break;
+			case GEN_CODE_RAW:
+				free(curr->data);
+				break;
+		}
+	}
+	free(act->acts);
+}
+
 extern void gen_fini(gen_type* gen) {
-	free(gen->top);
-	free(gen->req);
-	free(gen->prov);
-	free(gen->code);
+	free_act(&(gen->top));
+	free_act(&(gen->req));
+	free_act(&(gen->prov));
+	free_act(&(gen->code));
 	for (size_t i = 0; i < gen->token_cnt; ++i) {
 		free(gen->tokens[i].name);
 		free(gen->tokens[i].type);
@@ -32,20 +46,7 @@ extern void gen_fini(gen_type* gen) {
 	free(gen->lparams);
 	for (size_t i = 0; i < gen->rule_cnt; ++i) {
 		free(gen->rules[i].rhs.syms);
-		gen_act* curr = gen->rules[i].act;
-		while (curr != NULL) {
-			gen_act* tmp = curr;
-			curr = tmp->next;
-			switch (tmp->type) {
-				case GEN_CODE_SELF:
-				case GEN_CODE_COMP:
-					break;
-				case GEN_CODE_RAW:
-					free(tmp->data);
-					break;
-			}
-			free(tmp);
-		}
+		free_act(&(gen->rules[i].act));
 	}
 	free(gen->rules);
 	free(gen->prefixlo);

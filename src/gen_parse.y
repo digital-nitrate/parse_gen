@@ -43,7 +43,6 @@
 %token CODEREQDECL
 %token CODEPROVDECL
 %token CODEDECL
-%token <char*> CODEBLOCK
 %token <char*> IDEN
 %token <char*> TYPESPEC
 %token <unsigned int> UINT
@@ -63,26 +62,30 @@
 %nterm rules
 %nterm <struct {unsigned int low; unsigned int high;}> patterns
 %nterm <gen_slist> slist
-%nterm <gen_act*> actopt
-%nterm <gen_act*> code
+%nterm <gen_act> actopt
+%nterm <gen_act> code
 %nterm epilogue
 
 %destructor {
 	free($$);
-} CODEBLOCK IDEN TYPESPEC RAW typeopt
+} IDEN TYPESPEC RAW typeopt
 
 %destructor {
 	free($$.syms);
 } slist
 
 %destructor {
-	gen_act* curr = $$;
-	while (curr != NULL) {
-		gen_act* tmp = curr;
-		curr = tmp->next;
-		if (tmp->type == GEN_CODE_RAW) free(tmp->data);
-		free(tmp);
+	struct gen_code_unit const* end = $$.acts + $$.len;
+	for (struct gen_code_unit* curr = $$.acts; curr != end; ++curr) {
+		switch (curr->type) {
+			case GEN_CODE_COMP:
+				break;
+			case GEN_CODE_RAW:
+				free(curr->data);
+				break;
+		}
 	}
+	free($$.acts);
 } actopt code
 
 %%
@@ -100,45 +103,41 @@ declaration:
 
 decl:
 	%empty
-	| CODETOPDECL CODEBLOCK {
-		if (out->top != NULL) {
+	| CODETOPDECL LBR code RBR {
+		if (out->top.acts != NULL) {
 			fputs("codetop already set\n", stderr);
-			free($2);
 			YYERROR;
 		}
-		out->top = $2;
-		out->top_loc.first_line = @2.first_line;
-		out->top_loc.last_line = @2.last_line;
+		out->top = $3;
+		out->top_loc.first_line = @3.first_line;
+		out->top_loc.last_line = @3.last_line;
 	}
-	| CODEREQDECL CODEBLOCK {
-		if (out->req != NULL) {
+	| CODEREQDECL LBR code RBR {
+		if (out->req.acts != NULL) {
 			fputs("coderequires already set\n", stderr);
-			free($2);
 			YYERROR;
 		}
-		out->req = $2;
-		out->req_loc.first_line = @2.first_line;
-		out->req_loc.last_line = @2.last_line;
+		out->req = $3;
+		out->req_loc.first_line = @3.first_line;
+		out->req_loc.last_line = @3.last_line;
 	}
-	| CODEPROVDECL CODEBLOCK {
-		if (out->prov != NULL) {
+	| CODEPROVDECL LBR code RBR {
+		if (out->prov.acts != NULL) {
 			fputs("codeprovides already set\n", stderr);
-			free($2);
 			YYERROR;
 		}
-		out->prov = $2;
-		out->prov_loc.first_line = @2.first_line;
-		out->prov_loc.last_line = @2.last_line;
+		out->prov = $3;
+		out->prov_loc.first_line = @3.first_line;
+		out->prov_loc.last_line = @3.last_line;
 	}
-	| CODEDECL CODEBLOCK {
-		if (out->code != NULL) {
+	| CODEDECL LBR code RBR {
+		if (out->code.acts != NULL) {
 			fputs("code already set\n", stderr);
-			free($2);
 			YYERROR;
 		}
-		out->code = $2;
-		out->code_loc.first_line = @2.first_line;
-		out->code_loc.last_line = @2.last_line;
+		out->code = $3;
+		out->code_loc.first_line = @3.first_line;
+		out->code_loc.last_line = @3.last_line;
 	}
 	| TOKENDECL typeopt IDEN UINT {
 		gen_ref* ar = malloc((sizeof *ar) * 16);
@@ -394,31 +393,33 @@ slist:
 	;
 
 actopt:
-	%empty {$$ = NULL;}
+	%empty {$$ = (gen_act){.acts=NULL,.len=0,.cap=0};}
 	| LBR code RBR {$$ = $2;}
 	;
 
 code:
-	%empty {$$ = NULL;}
-	| RAW code {
-		gen_act* node = malloc(sizeof *node);
-		if (node == NULL) {YYERROR;}
-		node->next = $2;
-		node->data = $1;
-		node->type = GEN_CODE_RAW;
-		$$ = node;
+	%empty {
+		struct gen_code_unit* acts = malloc((sizeof *acts) * 16);
+		if (acts == NULL) {YYERROR;}
+		$$ = (gen_act){.acts=acts,.len=0,.cap=16};
 	}
-	| VALREF code {
-		gen_act* node = malloc(sizeof *node);
-		if (node == NULL){YYERROR;}
-		node->next = $2;
-		if ($1 == 0) {
-			node->type = GEN_CODE_SELF;
-		} else {
-			node->index = $1 - 1;
-			node->type = GEN_CODE_COMP;
-		}
-		$$ = node;
+	| code RAW {
+		int res = 0;
+		DYNARR_CHK($1.len, $1.cap, $1.acts, res);
+		if (res) {YYERROR;}
+		$1.acts[$1.len].type = GEN_CODE_RAW;
+		$1.acts[$1.len].data = $2;
+		++($1.len);
+		$$ = $1;
+	}
+	| code VALREF {
+		int res = 0;
+		DYNARR_CHK($1.len, $1.cap, $1.acts, res);
+		if (res) {YYERROR;}
+		$1.acts[$1.len].type = GEN_CODE_COMP;
+		$1.acts[$1.len].index = $2;
+		++($1.len);
+		$$ = $1;
 	}
 	;
 
@@ -447,10 +448,10 @@ int init_gen(gen_type* gen) {
 	if (gen->lparams == NULL) goto CleanPParams;
 	gen->rules = malloc((sizeof *(gen->rules)) * 16);
 	if (gen->rules == NULL) goto CleanParams;
-	gen->top = NULL;
-	gen->req = NULL;
-	gen->prov = NULL;
-	gen->code = NULL;
+	gen->top.acts = NULL;
+	gen->req.acts = NULL;
+	gen->prov.acts = NULL;
+	gen->code.acts = NULL;
 	gen->token_cnt = 0;
 	gen->token_cap = 16;
 	gen->nterm_cnt = 0;

@@ -1,7 +1,7 @@
 %option 7bit reentrant bison-bridge bison-locations
 
-%option yylineno
-%option noyywrap nounput noinput nodefault
+%option yylineno stack
+%option noyywrap nounput noinput nodefault noyy_top_state
 
 %s rules end code
 
@@ -37,8 +37,8 @@
 <rules>\/empty {return EMPTYDECL;}
 <INITIAL>%% {BEGIN(rules);return SECSEP;}
 <rules>%% {BEGIN(end);return SECSEP;}
-<rules>\/\{ {BEGIN(code);return LBR;}
-<code>\/\} {BEGIN(rules);return RBR;}
+<INITIAL,rules>\/\{ {yy_push_state(code, yyscanner);return LBR;}
+<code>\/\} {yy_pop_state(yyscanner);return RBR;}
 <INITIAL>[0-9]+ {
 	unsigned int value = 0;
 	for (int i = 0; i < yyleng; ++i) value = 10 * value + (yytext[i] - '0');
@@ -60,14 +60,6 @@
 	data[yyleng - 1] = '\0';
 	yylval_param->TYPESPEC = data;
 	return TYPESPEC;
-}
-<INITIAL>\/\{(\*|\}|\/*([^\*\/\"\'\}]|\/\*([^\*]|\*+[^\*\/])*\*+\/|\"([^\"\\]|\\(.|\n))*\"|\'([^\'\\]|\\(.|\n))*\'))*\/\} {
-	char* data = malloc(yyleng - 3);
-	if (data == NULL) return LEXERR;
-	memcpy(data, yytext + 2, yyleng - 4);
-	data[yyleng - 3] = '\0';
-	yylval_param->CODEBLOCK = data;
-	return CODEBLOCK;
 }
 <code>\$[0-9]+ {
 	unsigned int value = 0;
