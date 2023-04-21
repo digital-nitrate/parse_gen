@@ -1,0 +1,11 @@
+-- add manual error activation view $! symbol
+-- coallese parser code block representation into a single type
+-- merge self value and rule value reference representations into same type
+-- add destructors for tokens and nonterminals which will be called upon errors
+
+
+-- sticter restrictions on rule nature
+-- better interior integer type representations
+
+
+-- double check memory safety for both generator and generated code
