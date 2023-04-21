@@ -59,11 +59,7 @@ int gen_wrt_ll1_h(gen_type const* restrict gen, char const* restrict outpath) {
 int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table, char const* restrict outpath) {
 	FILE* out = fopen(outpath, "wb");
 	if (out == NULL) return 1;
-	size_t max_len = 0;
 	int curr_line = 1;
-	for (size_t i = 0; i < gen->rule_cnt; ++i) {
-		if (gen->rules[i].rhs.cnt > max_len) max_len = gen->rules[i].rhs.cnt;
-	}
 	char const* prelo = gen->prefixlo == NULL ? defprelo : gen->prefixlo;
 	char const* prehi = gen->prefixhi == NULL ? defprehi : gen->prefixhi;
 	if (gen->top != NULL) {
@@ -118,7 +114,7 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 			"%s\n"
 			"#line %d \"%s\"\n", gen->code_loc.first_line, gen->fname, gen->code, curr_line, outpath);
 	}
-	curr_line += 80 + gen->token_cnt + gen->nterm_cnt;
+	curr_line += 79 + gen->token_cnt + gen->nterm_cnt;
 	fprintf(out, "static unsigned int _%stran(int code) {\n"
 		"\tswitch (code) {\n", prelo);
 	for (size_t i = 0; i < gen->token_cnt; ++i) {
@@ -232,23 +228,31 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 	fprintf(out, ");\n"
 		"\treturn 1;\n"
 		"}\n"
-		"static int _%sreq(unsigned int _%sid, unsigned int* _%stid, YYSTYPE* _%stvl, YYSTYPE* _%slvalp", prelo, prelo, prelo, prelo, prelo);
+		"static int _%sreq(unsigned int _%sid, unsigned int* _%stid, YYSTYPE* _%stvl, void* _%slvalp", prelo, prelo, prelo, prelo, prelo);
 	for (size_t i = 0; i < gen->pparam_cnt; ++i) {
 		fprintf(out, ", %s %s", gen->pparams[i].type, gen->pparams[i].name);
 	}
 	fprintf(out, ") {\n"
-		"\t%sSTYPE _%sbuffer[%zu];\n"
-		"\tswitch(_%stab[_%sid * %zu + *_%stid]) {\n", prehi, prelo, max_len, prelo, prelo, gen->token_cnt + 2, prelo);
+		"\tswitch(_%stab[_%sid * %zu + *_%stid]) {\n", prelo, prelo, gen->token_cnt + 2, prelo);
 	for (size_t i = 0; i < gen->rule_cnt; ++i) {
 		++curr_line;
 		gen_slist rhs = gen->rules[i].rhs;
-		fprintf(out, "\t\tcase %zu:\n", i);
+		fprintf(out, "\t\tcase %zu: {\n", i);
 		for (size_t j = 0; j < rhs.cnt; ++j) {
 			if (rhs.syms[j].term) {
-				curr_line += 6;
-				fprintf(out, "\t\t\tif (*_%stid == %u) {\n"
-					"\t\t\t\t_%sbuffer[%zu] = *_%stvl;\n"
-					"\t\t\t\t*_%stid = _%stran(%slex(_%stvl", prelo, rhs.syms[j].ind, prelo, j, prelo, prelo, prelo, prelo, prelo);
+				char const* tn = gen->tokens[rhs.syms[j].ind].type;
+				if (tn != NULL) {
+					++curr_line;
+					fprintf(out, "\t\t\t%s _%sv%zu;\n", tn, prelo, j + 1);
+				}
+				++curr_line;
+				fprintf(out, "\t\t\tif (*_%stid == %u) {\n", prelo, rhs.syms[j].ind);
+				if (tn != NULL) {
+					++curr_line;
+					fprintf(out, "\t\t\t\t_%sv%zu = _%stvl->%s;\n", prelo, j + 1, prelo, gen->tokens[rhs.syms[j].ind].name);
+				}
+				curr_line += 4;
+				fprintf(out, "\t\t\t\t*_%stid = _%stran(%slex(_%stvl", prelo, prelo, prelo, prelo);
 				for (size_t i = 0; i < gen->lparam_cnt; ++i) {
 					fprintf(out, ", %s", gen->lparams[i].name);
 				}
@@ -261,8 +265,18 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 				fputs(");\n"
 					"\t\t\t}\n", out);
 			} else {
+				char const* tn = gen->nterms[rhs.syms[j].ind].type;
+				if (tn != NULL) {
+					++curr_line;
+					fprintf(out, "\t\t\t%s _%sv%zu;\n", tn, prelo, j + 1);
+				}
 				++curr_line;
-				fprintf(out, "\t\t\tif (_%sreq(%u, _%stid, _%stvl, _%sbuffer + %zu", prelo, rhs.syms[j].ind, prelo, prelo, prelo, j);
+				fprintf(out, "\t\t\tif (_%sreq(%u, _%stid, _%stvl, ", prelo, rhs.syms[j].ind, prelo, prelo);
+				if (tn != NULL) {
+					fprintf(out, "&_%sv%zu", prelo, j + 1);
+				} else {
+					fputs("(void*)0", out);
+				}
 				for (size_t i = 0; i < gen->pparam_cnt; ++i) {
 					fprintf(out, ", %s", gen->pparams[i].name);
 				}
@@ -270,17 +284,15 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 			}
 		}
 		gen_act* curr = gen->rules[i].act;
-		curr_line += 6 + gen->rules[i].act_loc.last_line - gen->rules[i].act_loc.first_line;
-		fprintf(out, "\t\t\t{\n"
-			"#line %d \"%s\"\n", gen->rules[i].act_loc.first_line, gen->fname);
+		curr_line += 5 + gen->rules[i].act_loc.last_line - gen->rules[i].act_loc.first_line;
+		fprintf(out, "#line %d \"%s\"\n", gen->rules[i].act_loc.first_line, gen->fname);
 		while (curr != NULL) {
 			switch (curr->type) {
 				case GEN_CODE_SELF:
-					fprintf(out, "(_%slvalp->%s)", prelo, gen->nterms[gen->rules[i].lhs.ind].name);
+					fprintf(out, "(*(%s*)_%slvalp)", gen->nterms[gen->rules[i].lhs.ind].type, prelo);
 					break;
 				case GEN_CODE_COMP: {
-					char const* name = rhs.syms[curr->index].term ? gen->tokens[rhs.syms[curr->index].ind].name : gen->nterms[rhs.syms[curr->index].ind].name;
-					fprintf(out, "(_%sbuffer[%u].%s)", prelo, curr->index, name);
+					fprintf(out, "(_%sv%u)", prelo, curr->index + 1);
 					break;
 				}
 				case GEN_CODE_RAW:
@@ -291,8 +303,8 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 		}
 		fprintf(out, "\n"
 			"#line %d \"%s\"\n"
-			"\t\t\t}\n"
-			"\t\t\tbreak;\n", curr_line - 2, outpath);
+			"\t\t\tbreak;\n"
+			"\t\t}\n", curr_line - 2, outpath);
 	}
 	curr_line += 10;
 	fprintf(out, "\t\tdefault: return _%sntmerrmsg(_%sid, *_%stid", prelo, prelo, prelo);
