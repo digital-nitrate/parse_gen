@@ -15,6 +15,7 @@
 	#include "generator.h"
 	#include "macros.h"
 	static void yyerror(YYLTYPE*, gen_type*, struct hash_table*, yyscan_t, char const*);
+	static int dup_act(gen_act* restrict, gen_act const* restrict);
 	static int init_gen(gen_type*);
 }
 
@@ -42,7 +43,9 @@
 %token CODETOPDECL
 %token CODEREQDECL
 %token CODEPROVDECL
+%token DESTRUCTDECL
 %token CODEDECL
+%token CODEMERR
 %token <char*> IDEN
 %token <char*> TYPESPEC
 %token <unsigned int> UINT
@@ -63,8 +66,9 @@
 %nterm <struct {unsigned int low; unsigned int high;}> patterns
 %nterm <gen_slist> slist
 %nterm <gen_act> actopt
-%nterm <gen_act> code
+%nterm <struct {gen_act act; size_t cap;}> code
 %nterm epilogue
+%nterm <struct {gen_sid* ids; size_t len; size_t cap;}> idenlist
 
 %destructor {
 	free($$);
@@ -78,6 +82,7 @@
 	struct gen_code_unit const* end = $$.acts + $$.len;
 	for (struct gen_code_unit* curr = $$.acts; curr != end; ++curr) {
 		switch (curr->type) {
+			case GEN_CODE_MERR:
 			case GEN_CODE_COMP:
 				break;
 			case GEN_CODE_RAW:
@@ -86,7 +91,22 @@
 		}
 	}
 	free($$.acts);
-} actopt code
+} actopt
+
+%destructor {
+	struct gen_code_unit const* end = $$.act.acts + $$.act.len;
+	for (struct gen_code_unit* curr = $$.act.acts; curr != end; ++curr) {
+		switch (curr->type) {
+			case GEN_CODE_MERR:
+			case GEN_CODE_COMP:
+				break;
+			case GEN_CODE_RAW:
+				free(curr->data);
+				break;
+		}
+	}
+	free($$.act.acts);
+} code
 
 %%
 
@@ -108,36 +128,37 @@ decl:
 			fputs("codetop already set\n", stderr);
 			YYERROR;
 		}
-		out->top = $3;
-		out->top_loc.first_line = @3.first_line;
-		out->top_loc.last_line = @3.last_line;
+		out->top = $3.act;
 	}
 	| CODEREQDECL LBR code RBR {
 		if (out->req.acts != NULL) {
 			fputs("coderequires already set\n", stderr);
 			YYERROR;
 		}
-		out->req = $3;
-		out->req_loc.first_line = @3.first_line;
-		out->req_loc.last_line = @3.last_line;
+		out->req = $3.act;
 	}
 	| CODEPROVDECL LBR code RBR {
 		if (out->prov.acts != NULL) {
 			fputs("codeprovides already set\n", stderr);
 			YYERROR;
 		}
-		out->prov = $3;
-		out->prov_loc.first_line = @3.first_line;
-		out->prov_loc.last_line = @3.last_line;
+		out->prov = $3.act;
 	}
 	| CODEDECL LBR code RBR {
 		if (out->code.acts != NULL) {
 			fputs("code already set\n", stderr);
 			YYERROR;
 		}
-		out->code = $3;
-		out->code_loc.first_line = @3.first_line;
-		out->code_loc.last_line = @3.last_line;
+		out->code = $3.act;
+	}
+	| DESTRUCTDECL LBR code RBR idenlist {
+		gen_sid const* end = $5.ids + $5.len;
+		for (gen_sid const* curr = $5.ids; curr != end; ++curr) {
+			gen_act* dest = curr->term ? &(out->tokens[curr->ind].des) : &(out->nterms[curr->ind].des);
+			if (dest->acts != NULL) {YYERROR;}
+			if (dup_act(dest, &($3.act))) {YYERROR;}
+		}
+		free($5.ids);
 	}
 	| TOKENDECL typeopt IDEN UINT {
 		gen_ref* ar = malloc((sizeof *ar) * 16);
@@ -162,6 +183,7 @@ decl:
 		out->tokens[sym.ind].type = $2;
 		out->tokens[sym.ind].id = $4;
 		out->tokens[sym.ind].rh = (gen_rarr){.rules=ar,.cnt=0,.cap=16};
+		out->tokens[sym.ind].des.acts = NULL;
 	}
 	| NTERMDECL typeopt IDEN {
 		gen_ref* ar = malloc((sizeof *ar) * 16);
@@ -195,6 +217,7 @@ decl:
 		out->nterms[sym.ind].type = $2;
 		out->nterms[sym.ind].rh = (gen_rarr){.rules=ar,.cnt=0,.cap=16};
 		out->nterms[sym.ind].lh = (gen_rarr){.rules=al,.cnt=0,.cap=16};
+		out->nterms[sym.ind].des.acts = NULL;
 	}
 	| STARTDECL IDEN {
 		if (out->start.error == 0) {
@@ -272,6 +295,27 @@ decl:
 	}
 	;
 
+idenlist:
+	%empty {
+		$$.ids = malloc((sizeof *($$.ids)) * 16);
+		if ($$.ids == NULL) {YYERROR;}
+		$$.len = 0;
+		$$.cap = 16;
+	}
+	| idenlist IDEN {
+		int res = 0;
+		DYNARR_CHK($1.len, $1.cap, $1.ids, res);
+		if (res) {YYERROR;}
+		gen_sid id = hash_ld(out, hash, $2);
+		if (id.error) {YYERROR;}
+		$1.ids[$1.len] = id;
+		++($1.len);
+		$$.ids = $1.ids;
+		$$.len = $1.len;
+		$$.cap = $1.cap;
+	}
+	;
+
 typeopt:
 	%empty {$$ = NULL;}
 	| TYPESPEC {$$ = $1;}
@@ -324,8 +368,6 @@ patterns:
 			++(r->cnt);
 		}
 		out->rules[out->rule_cnt].act = $2;
-		out->rules[out->rule_cnt].act_loc.first_line = @2.first_line;
-		out->rules[out->rule_cnt].act_loc.last_line = @2.last_line;
 		out->rules[out->rule_cnt].rhs = $1;
 		$$.low = out->rule_cnt;
 		$$.high = $$.low + 1;
@@ -349,8 +391,6 @@ patterns:
 			++(r->cnt);
 		}
 		out->rules[out->rule_cnt].act = $4;
-		out->rules[out->rule_cnt].act_loc.first_line = @4.first_line;
-		out->rules[out->rule_cnt].act_loc.last_line = @4.last_line;
 		out->rules[out->rule_cnt].rhs = $3;
 		$$.low = $1.low;
 		$$.high = $1.high + 1;
@@ -393,33 +433,54 @@ slist:
 	;
 
 actopt:
-	%empty {$$ = (gen_act){.acts=NULL,.len=0,.cap=0};}
-	| LBR code RBR {$$ = $2;}
+	%empty {$$.acts = NULL;}
+	| LBR code RBR {$$ = $2.act;}
 	;
 
 code:
 	%empty {
 		struct gen_code_unit* acts = malloc((sizeof *acts) * 16);
 		if (acts == NULL) {YYERROR;}
-		$$ = (gen_act){.acts=acts,.len=0,.cap=16};
+		$$.act.acts = acts;
+		$$.act.len = 0;
+		$$.act.loc.first_line = @$.first_line;
+		$$.act.loc.last_line = @$.last_line;
+		$$.cap = 16;
 	}
 	| code RAW {
 		int res = 0;
-		DYNARR_CHK($1.len, $1.cap, $1.acts, res);
+		DYNARR_CHK($1.act.len, $1.cap, $1.act.acts, res);
 		if (res) {YYERROR;}
-		$1.acts[$1.len].type = GEN_CODE_RAW;
-		$1.acts[$1.len].data = $2;
-		++($1.len);
-		$$ = $1;
+		$1.act.acts[$1.act.len].type = GEN_CODE_RAW;
+		$1.act.acts[$1.act.len].data = $2;
+		++($1.act.len);
+		$1.act.loc.first_line = @$.first_line;
+		$1.act.loc.last_line = @$.last_line;
+		$$.act = $1.act;
+		$$.cap = $1.cap;
 	}
 	| code VALREF {
 		int res = 0;
-		DYNARR_CHK($1.len, $1.cap, $1.acts, res);
+		DYNARR_CHK($1.act.len, $1.cap, $1.act.acts, res);
 		if (res) {YYERROR;}
-		$1.acts[$1.len].type = GEN_CODE_COMP;
-		$1.acts[$1.len].index = $2;
-		++($1.len);
-		$$ = $1;
+		$1.act.acts[$1.act.len].type = GEN_CODE_COMP;
+		$1.act.acts[$1.act.len].index = $2;
+		++($1.act.len);
+		$1.act.loc.first_line = @$.first_line;
+		$1.act.loc.last_line = @$.last_line;
+		$$.act = $1.act;
+		$$.cap = $1.cap;
+	}
+	| code CODEMERR {
+		int res = 0;
+		DYNARR_CHK($1.act.len, $1.cap, $1.act.acts, res);
+		if (res) {YYERROR;}
+		$1.act.acts[$1.act.len].type = GEN_CODE_MERR;
+		++($1.act.len);
+		$1.act.loc.first_line = @$.first_line;
+		$1.act.loc.last_line = @$.last_line;
+		$$.act = $1.act;
+		$$.cap = $1.cap;
 	}
 	;
 
@@ -429,6 +490,35 @@ epilogue:
 	;
 
 %%
+
+int dup_act(gen_act* restrict dest, gen_act const* restrict src) {
+	struct gen_code_unit* cact = malloc((sizeof *cact) * src->len);
+	if (cact == NULL) return 1;
+	for (size_t i = 0; i < src->len; ++i) {
+		switch (src->acts[i].type) {
+			case GEN_CODE_COMP:
+				cact[i].type = GEN_CODE_COMP;
+				cact[i].index = src->acts[i].index;
+				break;
+			case GEN_CODE_MERR:
+				cact[i].type = GEN_CODE_MERR;
+				break;
+			case GEN_CODE_RAW: {
+				size_t ln = strlen(src->acts[i].data);
+				char* cdat = malloc(ln + 1);
+				if (cdat == NULL) return 1;
+				memcpy(cdat, src->acts[i].data, ln + 1);
+				cact[i].type = GEN_CODE_RAW;
+				cact[i].data = cdat;
+				break;
+			}
+		}
+	}
+	dest->acts = cact;
+	dest->len = src->len;
+	dest->loc = src->loc;
+	return 0;
+}
 
 void yyerror(YYLTYPE* locp, gen_type* out, struct hash_table* hash, yyscan_t scanner, char const* msg) {
 	(void)out;

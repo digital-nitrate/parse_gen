@@ -1,9 +1,7 @@
--- add manual error activation via $! symbol
--- add support for destructors for tokens and nonterminals which will be called upon errors
-
-
 -- sticter restrictions on rule nature
 -- better interior integer type representations
 
 
 -- double check memory safety for both generator and generated code
+
+-- rework documentation

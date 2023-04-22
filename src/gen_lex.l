@@ -34,7 +34,9 @@
 <INITIAL>\/coderequires {return CODEREQDECL;}
 <INITIAL>\/codeprovides {return CODEPROVDECL;}
 <INITIAL>\/code {return CODEDECL;}
+<INITIAL>\/destructor {return DESTRUCTDECL;}
 <rules>\/empty {return EMPTYDECL;}
+<code>\$! {return CODEMERR;}
 <INITIAL>%% {BEGIN(rules);return SECSEP;}
 <rules>%% {BEGIN(end);return SECSEP;}
 <INITIAL,rules>\/\{ {yy_push_state(code, yyscanner);return LBR;}
@@ -57,7 +59,7 @@
 	char* data = malloc(yyleng - 1);
 	if (data == NULL) return LEXERR;
 	memcpy(data, yytext + 1, yyleng - 2);
-	data[yyleng - 1] = '\0';
+	data[yyleng - 2] = '\0';
 	yylval_param->TYPESPEC = data;
 	return TYPESPEC;
 }
