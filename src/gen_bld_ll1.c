@@ -3,36 +3,108 @@
 
 #include "generator.h"
 
+#include "macros.h"
+
+struct ref {
+	gen_rind rule;
+	gen_roff loc;
+};
+
+struct rarr {
+	struct ref* refs;
+	size_t cnt;
+	size_t cap;
+};
+
 struct ntdata {
 	unsigned int lambda:1, first:1, follow:1;
+	struct rarr rh;
+	struct rarr lh;
 };
+
+static int bld_met(gen_type const* restrict gen, struct rarr* tmet, struct ntdata* nmet) {
+	struct rarr const* tmet_end = tmet + gen->token_cnt;
+	for (struct rarr* curr = tmet; curr != tmet_end; ++curr) {
+		curr->refs = malloc((sizeof *(curr->refs)) * 16);
+		if (curr->refs == NULL) {
+			for (struct rarr* tmp = tmet; tmp != curr; ++tmp) free(tmp->refs);
+			goto Fail;
+		}
+		curr->cnt = 0;
+		curr->cap = 16;
+	}
+	struct ntdata const* nmet_end = nmet + gen->nterm_cnt;
+	for (struct ntdata* curr = nmet; curr != nmet_end; ++curr) {
+		curr->rh.refs = malloc((sizeof *(curr->rh.refs)) * 16);
+		curr->lh.refs = malloc((sizeof *(curr->lh.refs)) * 16);
+		if (curr->rh.refs == NULL || curr->lh.refs == NULL) {
+			free(curr->rh.refs);
+			free(curr->lh.refs);
+			for (struct ntdata* tmp = nmet; tmp != curr; ++tmp) {
+				free(tmp->rh.refs);
+				free(tmp->lh.refs);
+			}
+			goto CleanTmet;
+		}
+		curr->rh.cnt = 0;
+		curr->rh.cap = 16;
+		curr->lh.cnt = 0;
+		curr->lh.cap = 16;
+	}
+	gen_rule const* rend = gen->rules + gen->rule_cnt;
+	for (gen_rule const* curr = gen->rules; curr != rend; ++curr) {
+		int res = 0;
+		struct rarr* lh = &(nmet[curr->lhs].lh);
+		DYNARR_CHK(lh->cnt, lh->cap, lh->refs, res);
+		if (res != 0) goto CleanNmet;
+		lh->refs[lh->cnt] = (struct ref){.rule = (gen_rind)(curr - gen->rules), .loc = curr->rhs.cnt};
+		++(lh->cnt);
+		gen_sid const* send = curr->rhs.syms + curr->rhs.cnt;
+		for (gen_sid const* sc = curr->rhs.syms; sc != send; ++sc) {
+			struct rarr* rh = sc->term ? &(tmet[sc->ind]) : &(nmet[sc->ind].rh);
+			DYNARR_CHK(rh->cnt, rh->cap, rh->refs, res);
+			if (res != 0) goto CleanNmet;
+			rh->refs[rh->cnt] = (struct ref){.rule = (gen_rind)(curr - gen->rules), .loc = (gen_roff)(sc - curr->rhs.syms)};
+			++(rh->cnt);
+		}
+	}
+	return 0;
+	CleanNmet: for (struct ntdata* curr = nmet; curr != nmet_end; ++curr) {
+		free(curr->rh.refs);
+		free(curr->lh.refs);
+	}
+	CleanTmet: for (struct rarr* curr = tmet; curr != tmet_end; ++curr) free(curr->refs);
+	Fail: return 1;
+}
 
 static void bld_lam(gen_type const* restrict gen, gen_sind* restrict queue, struct ntdata* restrict nmet, gen_roff* restrict rsaves) {
 	gen_sind* queue_top = queue;
 	struct ntdata const* nmet_end = nmet + gen->nterm_cnt;
 	for (struct ntdata* curr = nmet; curr != nmet_end; ++curr) curr->lambda = 0;
-	for (gen_rind i = 0; i < gen->rule_cnt; ++i) {
-		rsaves[i] = 0;
-		if (gen->rules[i].rhs.cnt == 0 && nmet[gen->rules[i].lhs.ind].lambda == 0) {
-			nmet[gen->rules[i].lhs.ind].lambda = 1;
-			*queue_top = gen->rules[i].lhs.ind;
+	gen_rule const* rend = gen->rules + gen->rule_cnt;
+	for (gen_rule const* curr = gen->rules; curr != rend; ++curr) {
+		rsaves[curr - gen->rules] = 0;
+		if (curr->rhs.cnt == 0 && nmet[curr->lhs].lambda == 0) {
+			nmet[curr->lhs].lambda = 1;
+			*queue_top = curr->lhs;
 			++queue_top;
 		}
 	}
 	for (gen_sind* queue_curr = queue; queue_curr != queue_top; ++queue_curr) {
-		gen_rarr rs = gen->nterms[*queue_curr].rh;
-		for (gen_rind i = 0; i < rs.cnt; ++i) {
-			gen_rule* rule = &(gen->rules[rs.rules[i].rule]);
-			if (nmet[rule->lhs.ind].lambda) continue;
-			if (rs.rules[i].loc > rsaves[rs.rules[i].rule]) continue;
-			gen_roff cntr = rs.rules[i].loc;
+		struct rarr const* ls = &(nmet[*queue_curr].rh);
+		struct ref const* rend = ls->refs + ls->cnt;
+		for (struct ref const* curr = ls->refs; curr != rend; ++curr) {
+			gen_rule* rule = &(gen->rules[curr->rule]);
+			if (nmet[rule->lhs].lambda) continue;
+			if (curr->loc > rsaves[curr->rule]) continue;
+			gen_roff cntr = curr->loc;
 			while (cntr < rule->rhs.cnt && rule->rhs.syms[cntr].term == 0 && nmet[rule->rhs.syms[cntr].ind].lambda == 1) ++cntr;
 			if (cntr == rule->rhs.cnt) {
-				nmet[rule->lhs.ind].lambda = 1;
-				*queue_top = rule->lhs.ind;
+				nmet[rule->lhs].lambda = 1;
+				*queue_top = rule->lhs;
 				++queue_top;
 			}
-			rsaves[rs.rules[i].rule] = cntr;
+			rsaves[curr->rule] = cntr;
 		}
 	}
 	for (gen_rind i = 0; i < gen->rule_cnt; ++i) {
@@ -43,38 +115,38 @@ static void bld_lam(gen_type const* restrict gen, gen_sind* restrict queue, stru
 	}
 }
 
-static void trav_fst(gen_type const* restrict gen, struct ntdata* restrict nmet, gen_roff const* restrict rsaves, gen_rind* restrict table, gen_rarr const* restrict in, gen_sind** restrict queue_top, gen_sind t) {
+static void trav_fst(gen_type const* restrict gen, struct ntdata* restrict nmet, gen_roff const* restrict rsaves, gen_rind* restrict table, struct rarr const* restrict in, gen_sind** restrict queue_top, gen_sind t) {
 	for (size_t i = 0; i < in->cnt; ++i) {
-		if (rsaves[in->rules[i].rule] < in->rules[i].loc) continue;
-		gen_sid lhs = gen->rules[in->rules[i].rule].lhs;
-		if (nmet[lhs.ind].first == 0) {
-			nmet[lhs.ind].first = 1;
-			**queue_top = lhs.ind;
+		if (rsaves[in->refs[i].rule] < in->refs[i].loc) continue;
+		gen_sind lhs = gen->rules[in->refs[i].rule].lhs;
+		if (nmet[lhs].first == 0) {
+			nmet[lhs].first = 1;
+			**queue_top = lhs;
 			++*queue_top;
 		}
-		unsigned int tr = table[lhs.ind * (gen->token_cnt + 1) + t];
-		if (tr != GEN_RIND_MAX && tr != in->rules[i].rule) {
-			unsigned int lo = tr < in->rules[i].rule ? tr : in->rules[i].rule;
-			fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%u) {first set}; using %u\n", tr, in->rules[i].rule, lhs.ind, t, lo);
-			table[lhs.ind * (gen->token_cnt + 1) + t] = lo;
+		gen_rind tr = table[lhs * (gen->token_cnt + 1) + t];
+		if (tr != GEN_RIND_MAX && tr != in->refs[i].rule) {
+			gen_rind lo = tr < in->refs[i].rule ? tr : in->refs[i].rule;
+			fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%u) {first set}; using %u\n", tr, in->refs[i].rule, lhs, t, lo);
+			table[lhs * (gen->token_cnt + 1) + t] = lo;
 		} else {
-			table[lhs.ind * (gen->token_cnt + 1) + t] = in->rules[i].rule;
+			table[lhs * (gen->token_cnt + 1) + t] = in->refs[i].rule;
 		}
 	}
 }
 
-static void bld_fst(gen_type const* restrict gen, gen_sind* restrict queue, struct ntdata* restrict nmet, gen_roff const* restrict rsaves, gen_rind* restrict table, gen_sind t) {
+static void bld_fst(gen_type const* restrict gen, gen_sind* restrict queue, struct rarr const* restrict tmet, struct ntdata* restrict nmet, gen_roff const* restrict rsaves, gen_rind* restrict table, gen_sind t) {
 	gen_sind* queue_top = queue;
-	trav_fst(gen, nmet, rsaves, table, &(gen->tokens[t].rh), &queue_top, t);
+	trav_fst(gen, nmet, rsaves, table, &(tmet[t]), &queue_top, t);
 	for (gen_sind* queue_curr = queue; queue_curr != queue_top; ++queue_curr) {
-		trav_fst(gen, nmet, rsaves, table, &(gen->nterms[*queue_curr].rh), &queue_top, t);
+		trav_fst(gen, nmet, rsaves, table, &(nmet[*queue_curr].rh), &queue_top, t);
 	}
 }
 
-static void trav_fol(gen_type const* restrict gen, struct ntdata* restrict nmet, gen_rind* restrict table, gen_rarr const* restrict in, gen_sind** restrict queue_top, gen_sind t) {
+static void trav_fol(gen_type const* restrict gen, struct ntdata* restrict nmet, gen_rind* restrict table, struct rarr const* restrict in, gen_sind** restrict queue_top, gen_sind t) {
 	for (size_t i = 0; i < in->cnt; ++i) {
-		gen_rule* rule = &(gen->rules[in->rules[i].rule]);
-		size_t cntr = in->rules[i].loc;
+		gen_rule* rule = &(gen->rules[in->refs[i].rule]);
+		size_t cntr = in->refs[i].loc;
 		while (cntr != 0) {
 			gen_sid sym = rule->rhs.syms[cntr - 1];
 			if (sym.term == 1) break;
@@ -87,13 +159,13 @@ static void trav_fol(gen_type const* restrict gen, struct ntdata* restrict nmet,
 			--cntr;
 		}
 		if (cntr != 0) continue;
-		gen_rind tr = table[rule->lhs.ind * (gen->token_cnt + 1) + t];
-		if (tr != GEN_RIND_MAX && tr != in->rules[i].rule) {
-			gen_rind lo = tr < in->rules[i].rule ? tr : in->rules[i].rule;
-			fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%u) {follow set}; using %u\n", tr, in->rules[i].rule, rule->lhs.ind, t, lo);
-			table[rule->lhs.ind * (gen->token_cnt + 1) + t] = lo;
+		gen_rind tr = table[rule->lhs * (gen->token_cnt + 1) + t];
+		if (tr != GEN_RIND_MAX && tr != in->refs[i].rule) {
+			gen_rind lo = tr < in->refs[i].rule ? tr : in->refs[i].rule;
+			fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%u) {follow set}; using %u\n", tr, in->refs[i].rule, rule->lhs, t, lo);
+			table[rule->lhs * (gen->token_cnt + 1) + t] = lo;
 		} else {
-			table[rule->lhs.ind * (gen->token_cnt + 1) + t] = in->rules[i].rule;
+			table[rule->lhs * (gen->token_cnt + 1) + t] = in->refs[i].rule;
 		}
 	}
 }
@@ -101,8 +173,10 @@ static void trav_fol(gen_type const* restrict gen, struct ntdata* restrict nmet,
 gen_rind* gen_bld_ll1(gen_type const* gen) {
 	gen_rind* table = malloc((sizeof *table) * (gen->token_cnt + 1) * gen->nterm_cnt);
 	gen_roff* rsaves = malloc((sizeof *rsaves) * gen->rule_cnt);
+	struct rarr* tmet = malloc((sizeof *tmet) * gen->token_cnt);
 	struct ntdata* nmet = malloc((sizeof *nmet) * gen->nterm_cnt);
 	gen_sind* queue = malloc((sizeof *queue) * gen->nterm_cnt);
+	bld_met(gen, tmet, nmet);
 	gen_rind const* table_end = table + (size_t)(gen->token_cnt + 1) * gen->nterm_cnt;
 	for (gen_rind* curr = table; curr != table_end; ++curr) *curr = GEN_RIND_MAX;
 	bld_lam(gen, queue, nmet, rsaves);
@@ -112,15 +186,15 @@ gen_rind* gen_bld_ll1(gen_type const* gen) {
 			curr->first = 0;
 			curr->follow = 0;
 		}
-		bld_fst(gen, queue, nmet, rsaves, table, t);
+		bld_fst(gen, queue, tmet, nmet, rsaves, table, t);
 		gen_sind* queue_top = queue;
-		trav_fol(gen, nmet, table, &(gen->tokens[t].rh), &queue_top, t);
+		trav_fol(gen, nmet, table, &(tmet[t]), &queue_top, t);
 		for (gen_sind i = 0; i < gen->nterm_cnt; ++i) {
 			if (nmet[i].first == 0) continue;
-			trav_fol(gen, nmet, table, &(gen->nterms[i].rh), &queue_top, t);
+			trav_fol(gen, nmet, table, &(nmet[i].rh), &queue_top, t);
 		}
 		for (gen_sind* queue_curr = queue; queue_curr != queue_top; ++queue_curr) {
-			trav_fol(gen, nmet, table, &(gen->nterms[*queue_curr].lh), &queue_top, t);
+			trav_fol(gen, nmet, table, &(nmet[*queue_curr].lh), &queue_top, t);
 		}
 	}
 	for (struct ntdata* curr = nmet; curr != nmet_end; ++curr) {
@@ -132,9 +206,16 @@ gen_rind* gen_bld_ll1(gen_type const* gen) {
 	*queue_top = gen->start.ind;
 	++queue_top;
 	for (gen_sind* queue_curr = queue; queue_curr != queue_top; ++queue_curr) {
-		trav_fol(gen, nmet, table, &(gen->nterms[*queue_curr].lh), &queue_top, gen->token_cnt);
+		trav_fol(gen, nmet, table, &(nmet[*queue_curr].lh), &queue_top, gen->token_cnt);
 	}
 	free(queue);
+	struct rarr const* tmet_end = tmet + gen->token_cnt;
+	for (struct rarr* curr = tmet; curr != tmet_end; ++curr) free(curr->refs);
+	free(tmet);
+	for (struct ntdata* curr = nmet; curr != nmet_end; ++curr) {
+		free(curr->rh.refs);
+		free(curr->lh.refs);
+	}
 	free(nmet);
 	free(rsaves);
 	return table;

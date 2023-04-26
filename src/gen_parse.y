@@ -89,7 +89,7 @@
 %nterm <char*> typeopt
 %nterm rules
 %nterm <struct {gen_rind low; gen_rind high;}> patterns
-%nterm <gen_slist> slist
+%nterm <struct {gen_slist ls; size_t cap;}> slist
 %nterm <gen_act> actopt
 %nterm <struct {gen_act act; size_t cap;}> code
 %nterm epilogue
@@ -100,7 +100,7 @@
 } IDEN TYPESPEC RAW typeopt
 
 %destructor {
-	free($$.syms);
+	free($$.ls.syms);
 } slist
 
 %destructor {
@@ -176,16 +176,8 @@ decl:
 		free($5.ids);
 	}
 	| TOKENDECL typeopt IDEN UINT {
-		gen_ref* ar = malloc((sizeof *ar) * 16);
-		if (ar == NULL) {
-			free($2);
-			free($3);
-			ERR_MEM;
-			YYERROR;
-		}
 		gen_sid sym = hash_add(out, hash, caps, $3, 1);
 		if (sym.error) {
-			free(ar);
 			free($2);
 			free($3);
 			if (sym.term) {
@@ -197,29 +189,11 @@ decl:
 		}
 		out->tokens[sym.ind].type = $2;
 		out->tokens[sym.ind].id = $4;
-		out->tokens[sym.ind].rh = (gen_rarr){.rules=ar,.cnt=0,.cap=16};
 		out->tokens[sym.ind].des.acts = NULL;
 	}
 	| NTERMDECL typeopt IDEN {
-		gen_ref* ar = malloc((sizeof *ar) * 16);
-		if (ar == NULL) {
-			free($2);
-			free($3);
-			ERR_MEM;
-			YYERROR;
-		}
-		gen_ref* al = malloc((sizeof *al) * 16);
-		if (al == NULL) {
-			free(ar);
-			free($2);
-			free($3);
-			ERR_MEM;
-			YYERROR;
-		}
 		gen_sid sym = hash_add(out, hash, caps, $3, 0);
 		if (sym.error) {
-			free(al);
-			free(ar);
 			free($2);
 			free($3);
 			if (sym.term) {
@@ -230,8 +204,6 @@ decl:
 			YYERROR;
 		}
 		out->nterms[sym.ind].type = $2;
-		out->nterms[sym.ind].rh = (gen_rarr){.rules=ar,.cnt=0,.cap=16};
-		out->nterms[sym.ind].lh = (gen_rarr){.rules=al,.cnt=0,.cap=16};
 		out->nterms[sym.ind].des.acts = NULL;
 	}
 	| STARTDECL IDEN {
@@ -360,18 +332,7 @@ rules:
 			ERR_PRINT(@2, "expected nonterminal");
 			YYERROR;
 		}
-		gen_rarr* r = &(out->nterms[sym.ind].lh);
-		for (size_t i = $4.low; i < $4.high; ++i) {
-			int res = 0;
-			DYNARR_CHK(r->cnt, r->cap, r->rules, res);
-			if (res) {
-				ERR_MEM;
-				YYERROR;
-			}
-			r->rules[r->cnt] = (gen_ref){.rule=i,.loc=out->rules[i].rhs.cnt};
-			++(r->cnt);
-			out->rules[i].lhs = sym;
-		}
+		for (size_t i = $4.low; i < $4.high; ++i) out->rules[i].lhs = sym.ind;
 	}
 	;
 
@@ -380,25 +341,13 @@ patterns:
 		int res = 0;
 		DYNARR_CHK(out->rule_cnt, caps->rule_cap, out->rules, res);
 		if (res) {
-			free($1.syms);
+			free($1.ls.syms);
 			gen_act_fini(&($2));
 			ERR_MEM;
 			YYERROR;
 		}
-		for (size_t i = 0; i < $1.cnt; ++i) {
-			gen_rarr* r = $1.syms[i].term ? &(out->tokens[$1.syms[i].ind].rh) : &(out->nterms[$1.syms[i].ind].rh);
-			DYNARR_CHK(r->cnt, r->cap, r->rules, res);
-			if (res) {
-				free($1.syms);
-				gen_act_fini(&($2));
-				ERR_MEM;
-				YYERROR;
-			}
-			r->rules[r->cnt] = (gen_ref){.rule=out->rule_cnt,.loc=i};
-			++(r->cnt);
-		}
 		out->rules[out->rule_cnt].act = $2;
-		out->rules[out->rule_cnt].rhs = $1;
+		out->rules[out->rule_cnt].rhs = $1.ls;
 		$$.low = out->rule_cnt;
 		$$.high = $$.low + 1;
 		++(out->rule_cnt);
@@ -407,25 +356,13 @@ patterns:
 		int res = 0;
 		DYNARR_CHK(out->rule_cnt, caps->rule_cap, out->rules, res);
 		if (res) {
-			free($3.syms);
+			free($3.ls.syms);
 			gen_act_fini(&($4));
 			ERR_MEM;
 			YYERROR;
 		}
-		for (size_t i = 0; i < $3.cnt; ++i) {
-			gen_rarr* r = $3.syms[i].term ? &(out->tokens[$3.syms[i].ind].rh) : &(out->nterms[$3.syms[i].ind].rh);
-			DYNARR_CHK(r->cnt, r->cap, r->rules, res);
-			if (res) {
-				free($3.syms);
-				gen_act_fini(&($4));
-				ERR_MEM;
-				YYERROR;
-			}
-			r->rules[r->cnt] = (gen_ref){.rule=out->rule_cnt,.loc=i};
-			++(r->cnt);
-		}
 		out->rules[out->rule_cnt].act = $4;
-		out->rules[out->rule_cnt].rhs = $3;
+		out->rules[out->rule_cnt].rhs = $3.ls;
 		$$.low = $1.low;
 		$$.high = $1.high + 1;
 		++(out->rule_cnt);
@@ -439,8 +376,8 @@ slist:
 			ERR_MEM;
 			YYERROR;
 		}
-		$$.syms = syms;
-		$$.cnt = 0;
+		$$.ls.syms = syms;
+		$$.ls.cnt = 0;
 		$$.cap = 16;
 	}
 	| EMPTYDECL {
@@ -449,28 +386,29 @@ slist:
 			ERR_MEM;
 			YYERROR;
 		}
-		$$.syms = syms;
-		$$.cnt = 0;
+		$$.ls.syms = syms;
+		$$.ls.cnt = 0;
 		$$.cap = 16;
 	}
 	| slist IDEN {
 		gen_sid sym = hash_ld(out, hash, $2);
 		free($2);
 		if (sym.error) {
-			free($1.syms);
+			free($1.ls.syms);
 			ERR_PRINT(@2, "symbol not found");
 			YYERROR;
 		}
 		int res = 0;
-		DYNARR_CHK($1.cnt, $1.cap, $1.syms, res);
+		DYNARR_CHK($1.ls.cnt, $1.cap, $1.ls.syms, res);
 		if (res) {
-			free($1.syms);
+			free($1.ls.syms);
 			ERR_MEM;
 			YYERROR;
 		}
-		$1.syms[$1.cnt] = sym;
-		++($1.cnt);
-		$$ = $1;
+		$1.ls.syms[$1.ls.cnt] = sym;
+		++($1.ls.cnt);
+		$$.ls = $1.ls;
+		$$.cap = $1.cap;
 	}
 	;
 
@@ -612,7 +550,7 @@ int init_gen(gen_type* restrict gen, struct cap_track* restrict caps) {
 	gen->prefixlo = NULL;
 	gen->prefixhi = NULL;
 	gen->epilogue = NULL;
-	gen->start.error = 1;
+	gen->start = (gen_sid){.error = 1};
 	caps->token_cap = 16;
 	caps->nterm_cap = 16;
 	caps->pparam_cap = 16;
@@ -660,7 +598,7 @@ gen_sid hash_add(gen_type* restrict out, struct hash_table* restrict hash, struc
 		size_t nb = hash->bcnt * 2 - 1;
 		struct hash_bin* nbins = malloc((sizeof *nbins) * nb);
 		if (nbins == NULL) return (gen_sid){.error=1,.term=1};
-		for (size_t i = 0; i < nb; ++i) nbins[i].index.error = 1;
+		for (size_t i = 0; i < nb; ++i) nbins[i].index = (gen_sid){.error = 1};
 		for (size_t i = 0; i < hash->bcnt; ++i) {
 			if (hash->bins[i].index.error == 0) {
 				size_t loc = hash->bins[i].hval % nb;

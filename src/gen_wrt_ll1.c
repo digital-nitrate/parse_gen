@@ -321,7 +321,7 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 					break;
 				case GEN_CODE_COMP: {
 					if (curr->index == 0) {
-						fprintf(out, "(*(%s*)_%slvalp)", gen->nterms[gen->rules[i].lhs.ind].type, prelo);
+						fprintf(out, "(*(%s*)_%slvalp)", gen->nterms[gen->rules[i].lhs].type, prelo);
 					} else {
 						fprintf(out, "(_%sv%u)", prelo, curr->index);
 					}

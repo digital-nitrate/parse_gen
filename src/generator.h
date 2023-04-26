@@ -48,22 +48,10 @@ typedef struct gen_act {
 	gen_roff len;
 } gen_act;
 
-typedef struct gen_ref {
-	gen_rind rule;
-	gen_roff loc;
-} gen_ref;
-
-typedef struct gen_rarr {
-	gen_ref* rules;
-	size_t cap;
-	size_t cnt;
-} gen_rarr;
-
 typedef struct gen_tok {
 	char* name;
 	char* type;
 	gen_act des;
-	gen_rarr rh;
 	unsigned int id;
 } gen_tok;
 
@@ -71,8 +59,6 @@ typedef struct gen_ntm {
 	char* name;
 	char* type;
 	gen_act des;
-	gen_rarr rh;
-	gen_rarr lh;
 } gen_ntm;
 
 typedef struct gen_param {
@@ -82,14 +68,13 @@ typedef struct gen_param {
 
 typedef struct gen_slist {
 	gen_sid* syms;
-	size_t cnt;
-	size_t cap;
+	gen_roff cnt;
 } gen_slist;
 
 typedef struct gen_rule {
 	gen_act act;
 	gen_slist rhs;
-	gen_sid lhs;
+	gen_sind lhs;
 } gen_rule;
 
 typedef struct gen_type {

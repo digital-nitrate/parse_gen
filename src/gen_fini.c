@@ -23,14 +23,11 @@ extern void gen_fini(gen_type* gen) {
 	for (size_t i = 0; i < gen->token_cnt; ++i) {
 		free(gen->tokens[i].name);
 		free(gen->tokens[i].type);
-		free(gen->tokens[i].rh.rules);
 	}
 	free(gen->tokens);
 	for (size_t i = 0; i < gen->nterm_cnt; ++i) {
 		free(gen->nterms[i].name);
 		free(gen->nterms[i].type);
-		free(gen->nterms[i].rh.rules);
-		free(gen->nterms[i].lh.rules);
 	}
 	free(gen->nterms);
 	for (size_t i = 0; i < gen->pparam_cnt; ++i) {
