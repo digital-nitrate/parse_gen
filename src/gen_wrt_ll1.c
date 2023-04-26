@@ -42,11 +42,6 @@ int gen_wrt_ll1_h(gen_type const* restrict gen, char const* restrict outpath) {
 			fprintf(out, "\t%s %s;\n", gen->tokens[i].type, gen->tokens[i].name); ++curr_line;
 		}
 	}
-	for (size_t i = 0; i < gen->nterm_cnt; ++i) {
-		if (gen->nterms[i].type != NULL) {
-			fprintf(out, "\t%s %s;\n", gen->nterms[i].type, gen->nterms[i].name); ++curr_line;
-		}
-	}
 	fprintf(out, "} %sSTYPE;\n", prehi); ++curr_line;
 	if (gen->prov.acts != NULL) {
 		fprintf(out, "#line %d \"%s\"\n", gen->prov.loc.first_line, gen->fname); ++curr_line;
@@ -119,13 +114,7 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 			fprintf(out, "\t%s %s;\n", gen->tokens[i].type, gen->tokens[i].name); ++curr_line;
 		}
 	}
-	for (size_t i = 0; i < gen->nterm_cnt; ++i) {
-		if (gen->nterms[i].type != NULL) {
-			fprintf(out, "\t%s %s;\n", gen->nterms[i].type, gen->nterms[i].name); ++curr_line;
-		}
-	}
-	++curr_line;
-	fprintf(out, "} %sSTYPE;\n", prehi);
+	fprintf(out, "} %sSTYPE;\n", prehi); ++curr_line;
 	if (gen->prov.acts != NULL) {
 		fprintf(out, "#line %d \"%s\"\n", gen->prov.loc.first_line, gen->fname); ++curr_line;
 		struct gen_code_unit const* end = gen->prov.acts + gen->prov.len;
@@ -171,7 +160,7 @@ int gen_wrt_ll1(gen_type const* restrict gen, unsigned int const* restrict table
 		fprintf(out, "\t");
 		for (size_t j = 0; j < gen->token_cnt + 1; ++j) {
 			unsigned int v = table[i * (gen->token_cnt + 1) + j];
-			fprintf(out, "%zu, ", v == UINT_MAX ? gen->rule_cnt : v);
+			fprintf(out, "%zu, ", v == GEN_RIND_MAX ? gen->rule_cnt : v);
 		}
 		fprintf(out, "%zu,\n", gen->rule_cnt); ++curr_line;
 	}

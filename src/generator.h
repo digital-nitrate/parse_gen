@@ -19,7 +19,7 @@ typedef unsigned int gen_rind;
 typedef unsigned char gen_roff;
 
 typedef struct gen_sid {
-	unsigned int error:1, term:1, ind:30;
+	unsigned int ind:GEN_SIND_BIT, term:1, error:1;
 } gen_sid;
 
 
