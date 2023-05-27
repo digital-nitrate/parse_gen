@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include <limits.h>
+#include <stdio.h>
 
 #include "generator.h"
 
@@ -116,21 +116,22 @@ static void bld_lam(gen_type const* restrict gen, gen_sind* restrict queue, stru
 }
 
 static void trav_fst(gen_type const* restrict gen, struct ntdata* restrict nmet, gen_roff const* restrict rsaves, gen_rind* restrict table, struct rarr const* restrict in, gen_sind** restrict queue_top, gen_sind t) {
-	for (size_t i = 0; i < in->cnt; ++i) {
-		if (rsaves[in->refs[i].rule] < in->refs[i].loc) continue;
-		gen_sind lhs = gen->rules[in->refs[i].rule].lhs;
+	struct ref const* in_end = in->refs + in->cnt;
+	for (struct ref const* in_curr = in->refs; in_curr != in_end; ++in_curr) {
+		if (rsaves[in_curr->rule] < in_curr->loc) continue;
+		gen_sind lhs = gen->rules[in_curr->rule].lhs;
 		if (nmet[lhs].first == 0) {
 			nmet[lhs].first = 1;
 			**queue_top = lhs;
 			++*queue_top;
 		}
-		gen_rind tr = table[lhs * (gen->token_cnt + 1) + t];
-		if (tr != GEN_RIND_MAX && tr != in->refs[i].rule) {
-			gen_rind lo = tr < in->refs[i].rule ? tr : in->refs[i].rule;
-			fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%u) {first set}; using %u\n", tr, in->refs[i].rule, lhs, t, lo);
-			table[lhs * (gen->token_cnt + 1) + t] = lo;
+		gen_rind* tr = &(table[(size_t)lhs * (gen->token_cnt + 1) + t]);
+		if (*tr != GEN_RIND_MAX && *tr != in_curr->rule) {
+			gen_rind lo = *tr < in_curr->rule ? *tr : in_curr->rule;
+			fprintf(stderr, "warning: conflict for rules %"GEN_RIND_PRI" -- %"GEN_RIND_PRI" at (%"GEN_SIND_PRI",%"GEN_SIND_PRI") {first set}; using %"GEN_RIND_PRI"\n", *tr, in_curr->rule, lhs, t, lo);
+			*tr = lo;
 		} else {
-			table[lhs * (gen->token_cnt + 1) + t] = in->refs[i].rule;
+			*tr = in_curr->rule;
 		}
 	}
 }
@@ -144,9 +145,10 @@ static void bld_fst(gen_type const* restrict gen, gen_sind* restrict queue, stru
 }
 
 static void trav_fol(gen_type const* restrict gen, struct ntdata* restrict nmet, gen_rind* restrict table, struct rarr const* restrict in, gen_sind** restrict queue_top, gen_sind t) {
-	for (size_t i = 0; i < in->cnt; ++i) {
-		gen_rule* rule = &(gen->rules[in->refs[i].rule]);
-		size_t cntr = in->refs[i].loc;
+	struct ref const* in_end = in->refs + in->cnt;
+	for (struct ref const* in_curr = in->refs; in_curr != in_end; ++in_curr) {
+		gen_rule* rule = &(gen->rules[in_curr->rule]);
+		gen_roff cntr = in_curr->loc;
 		while (cntr != 0) {
 			gen_sid sym = rule->rhs.syms[cntr - 1];
 			if (sym.term == 1) break;
@@ -159,13 +161,13 @@ static void trav_fol(gen_type const* restrict gen, struct ntdata* restrict nmet,
 			--cntr;
 		}
 		if (cntr != 0) continue;
-		gen_rind tr = table[rule->lhs * (gen->token_cnt + 1) + t];
-		if (tr != GEN_RIND_MAX && tr != in->refs[i].rule) {
-			gen_rind lo = tr < in->refs[i].rule ? tr : in->refs[i].rule;
-			fprintf(stderr, "warning: conflict for rules %u -- %u at (%u,%u) {follow set}; using %u\n", tr, in->refs[i].rule, rule->lhs, t, lo);
-			table[rule->lhs * (gen->token_cnt + 1) + t] = lo;
+		gen_rind* tr = &(table[(size_t)(rule->lhs) * (gen->token_cnt + 1) + t]);
+		if (*tr != GEN_RIND_MAX && *tr != in_curr->rule) {
+			gen_rind lo = *tr < in_curr->rule ? *tr : in_curr->rule;
+			fprintf(stderr, "warning: conflict for rules %"GEN_RIND_PRI" -- %"GEN_RIND_PRI" at (%"GEN_SIND_PRI",%"GEN_SIND_PRI") {follow set}; using %"GEN_RIND_PRI"\n", *tr, in_curr->rule, rule->lhs, t, lo);
+			*tr = lo;
 		} else {
-			table[rule->lhs * (gen->token_cnt + 1) + t] = in->refs[i].rule;
+			*tr = in_curr->rule;
 		}
 	}
 }
@@ -176,7 +178,7 @@ gen_rind* gen_bld_ll1(gen_type const* gen) {
 	struct rarr* tmet = malloc((sizeof *tmet) * gen->token_cnt);
 	struct ntdata* nmet = malloc((sizeof *nmet) * gen->nterm_cnt);
 	gen_sind* queue = malloc((sizeof *queue) * gen->nterm_cnt);
-	bld_met(gen, tmet, nmet);
+	if (table == NULL || rsaves == NULL || tmet == NULL || nmet == NULL || queue == NULL || bld_met(gen, tmet, nmet)) goto Error;
 	gen_rind const* table_end = table + (size_t)(gen->token_cnt + 1) * gen->nterm_cnt;
 	for (gen_rind* curr = table; curr != table_end; ++curr) *curr = GEN_RIND_MAX;
 	bld_lam(gen, queue, nmet, rsaves);
@@ -219,4 +221,10 @@ gen_rind* gen_bld_ll1(gen_type const* gen) {
 	free(nmet);
 	free(rsaves);
 	return table;
+	Error: free(queue);
+	free(nmet);
+	free(tmet);
+	free(rsaves);
+	free(table);
+	return NULL;
 }

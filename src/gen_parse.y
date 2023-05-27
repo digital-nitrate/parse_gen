@@ -81,7 +81,7 @@
 %token LBR
 %token RBR
 %token <char*> RAW
-%token <unsigned int> VALREF
+%token <gen_roff> VALREF
 
 %nterm program
 %nterm declaration
@@ -338,6 +338,12 @@ rules:
 
 patterns:
 	slist actopt {
+		if (out->rule_cnt == GEN_RIND_MAX - 1) {
+			free($1.ls.syms);
+			gen_act_fini(&($2));
+			ERR_PRINT(@$, "too many rules defined");
+			YYERROR;
+		}
 		int res = 0;
 		DYNARR_CHK(out->rule_cnt, caps->rule_cap, out->rules, res);
 		if (res) {
@@ -353,6 +359,12 @@ patterns:
 		++(out->rule_cnt);
 	}
 	| patterns MID slist actopt {
+		if (out->rule_cnt == GEN_RIND_MAX - 1) {
+			free($3.ls.syms);
+			gen_act_fini(&($4));
+			ERR_PRINT(@$, "too many rules defined");
+			YYERROR;
+		}
 		int res = 0;
 		DYNARR_CHK(out->rule_cnt, caps->rule_cap, out->rules, res);
 		if (res) {
@@ -391,6 +403,12 @@ slist:
 		$$.cap = 16;
 	}
 	| slist IDEN {
+		if ($1.ls.cnt == GEN_ROFF_MAX - 1) {
+			free($1.ls.syms);
+			free($2);
+			ERR_PRINT(@$, "too long of a rule");
+			YYERROR;
+		}
 		gen_sid sym = hash_ld(out, hash, $2);
 		free($2);
 		if (sym.error) {

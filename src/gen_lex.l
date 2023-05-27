@@ -64,7 +64,7 @@
 	return TYPESPEC;
 }
 <code>\$[0-9]+ {
-	unsigned int value = 0;
+	gen_roff value = 0;
 	for (int i = 1; i < yyleng; ++i) value = 10 * value + (yytext[i] - '0');
 	yylval_param->VALREF = value;
 	return VALREF;
