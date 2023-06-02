@@ -582,15 +582,6 @@ int init_gen(gen_type* restrict gen, struct cap_track* restrict caps) {
 	Error: return 1;
 }
 
-int hash_init(struct hash_table* table) {
-	table->bins = malloc((sizeof *(table->bins)) * HASH_BASE);
-	if (table->bins == NULL) return 1;
-	for (size_t i = 0; i < HASH_BASE; ++i) table->bins[i].index.error = 1;
-	table->bcnt = HASH_BASE;
-	table->ecnt = 0;
-	return 0;
-}
-
 static uintmax_t compute_hash(char const* name) {
 	uintmax_t sum = 1337;
 	while (*name != '\0') {
@@ -600,61 +591,94 @@ static uintmax_t compute_hash(char const* name) {
 	return sum;
 }
 
+#define TMP_MALLOC(_bins, _size, ...) do {\
+	(_bins) = malloc((_size));\
+} while (0)
+#define TMP_FREE(_bins, ...) do {\
+	free((_bins));\
+} while (0)
+#define TMP_NEW_SIZE(_nb, _bcnt, ...) do {\
+	(_nb) = (_bcnt) * 2 - 1;\
+} while (0)
+#define TMP_INIT(_bin, ...) do {\
+	(_bin).index.error = 1;\
+} while (0)
+#define TMP_FILL(_chk, _hs, _key, _bin, _grm, _caps, _term, ...) do {\
+	if ((_term)) {\
+		DYNARR_CHK((_grm)->token_cnt, (_caps)->token_cap, (_grm)->tokens, (_chk));\
+		if ((_chk)) break;\
+		(_bin).index.ind = (_grm)->token_cnt;\
+		(_grm)->tokens[(_grm)->token_cnt].name = (_key);\
+		++((_grm)->token_cnt);\
+	} else {\
+		DYNARR_CHK((_grm)->nterm_cnt, (_caps)->nterm_cap, (_grm)->nterms, (_chk));\
+		if ((_chk)) break;\
+		(_bin).index.ind = (_grm)->nterm_cnt;\
+		(_grm)->nterms[(_grm)->nterm_cnt].name = (_key);\
+		++((_grm)->nterm_cnt);\
+	}\
+	(_bin).hval = (_hs);\
+	(_bin).index.error = 0;\
+	(_bin).index.term = (_term);\
+} while (0)
+#define TMP_IS_EMPTY(_flg, _bin, ...) do {\
+	(_flg) = (_bin).index.error;\
+} while (0)
+#define TMP_IS_MATCH(_flg, _key, _bin, _grm, ...) do {\
+	char const* cname = (_bin).index.term ? (_grm)->tokens[(_bin).index.ind].name : (_grm)->nterms[(_bin).index.ind].name;\
+	(_flg) = (strcmp(name, cname) == 0);\
+} while (0)
+#define TMP_PULL_HASH(_hs, _bin, ...) do {\
+	(_hs) = (_bin).hval;\
+} while (0)
+#define TMP_HASH(_hs, _key, ...) do {\
+	(_hs) = compute_hash((_key));\
+} while (0)
+#define TMP_MEM(_out, ...) do {\
+	(_out).error = 1;\
+	(_out).term = 1;\
+} while (0)
+#define TMP_EXIST(_out, ...) do {\
+	(_out).error = 1;\
+	(_out).term = 0;\
+} while (0)
+#define TMP_RET(_out, _bin, ...) do {\
+	(_out) = (_bin).index;\
+} while (0)
+#define TMP_ERR(_out, ...) do {\
+	(_out).error = 1;\
+} while (0)
+
+int hash_init(struct hash_table* table) {
+	HASH_INIT(struct hash_bin, TMP_INIT, TMP_MALLOC, HASH_BASE, table->bins, table->bcnt, table->ecnt);
+	return (table->bins == NULL) ? 1 : 0;
+}
+
 gen_sid hash_ld(gen_type const* restrict out, struct hash_table const* restrict hash, char const* restrict name) {
-	uintmax_t hs = compute_hash(name);
-	size_t loc = hs % hash->bcnt;
-	while (1) {
-		if (hash->bins[loc].index.error) return (gen_sid){.error=1};
-		char const* cname = hash->bins[loc].index.term ? out->tokens[hash->bins[loc].index.ind].name : out->nterms[hash->bins[loc].index.ind].name;
-		if (strcmp(name, cname) == 0) return hash->bins[loc].index;
-		loc = (loc + 1) % hash->bcnt;
-	}
+	gen_sid res;
+	HASH_LD(TMP_RET, TMP_IS_MATCH, TMP_ERR, TMP_IS_EMPTY, TMP_HASH, res, name, hash->bins, hash->bcnt, out);
+	return res;
 }
 
 gen_sid hash_add(gen_type* restrict out, struct hash_table* restrict hash, struct cap_track* restrict caps, char* restrict name, _Bool term) {
-	if (hash->bcnt * HASH_LOAD <= hash->ecnt) {
-		size_t nb = hash->bcnt * 2 - 1;
-		struct hash_bin* nbins = malloc((sizeof *nbins) * nb);
-		if (nbins == NULL) return (gen_sid){.error=1,.term=1};
-		for (size_t i = 0; i < nb; ++i) nbins[i].index = (gen_sid){.error = 1};
-		for (size_t i = 0; i < hash->bcnt; ++i) {
-			if (hash->bins[i].index.error == 0) {
-				size_t loc = hash->bins[i].hval % nb;
-				while (nbins[loc].index.error == 0) loc = (loc + 1) % nb;
-				nbins[loc] = hash->bins[i];
-			}
-		}
-		free(hash->bins);
-		hash->bcnt = nb;
-		hash->bins = nbins;
-	}
-	int res = 0;
-	if (term) DYNARR_CHK(out->token_cnt, caps->token_cap, out->tokens, res);
-	else DYNARR_CHK(out->nterm_cnt, caps->nterm_cap, out->nterms, res);
-	if (res) return (gen_sid){.error=1,.term=1};
-	uintmax_t hs = compute_hash(name);
-	size_t loc = hs % hash->bcnt;
-	while (1) {
-		if (hash->bins[loc].index.error) break;
-		char const* cname = hash->bins[loc].index.term ? out->tokens[hash->bins[loc].index.ind].name : out->nterms[hash->bins[loc].index.ind].name;
-		if (strcmp(name, cname) == 0) return (gen_sid){.error=1,.term=0};
-		loc = (loc + 1) % hash->bcnt;
-	}
-	hash->bins[loc].hval = hs;
-	hash->bins[loc].index.error = 0;
-	hash->bins[loc].index.term = term;
-	++(hash->ecnt);
-	if (term) {
-		hash->bins[loc].index.ind = out->token_cnt;
-		out->tokens[out->token_cnt].name = name;
-		++(out->token_cnt);
-	} else {
-		hash->bins[loc].index.ind = out->nterm_cnt;
-		out->nterms[out->nterm_cnt].name = name;
-		++(out->nterm_cnt);
-	}
-	return hash->bins[loc].index;
+	gen_sid res;
+	HASH_ADD(struct hash_bin, TMP_MALLOC, TMP_FREE, TMP_NEW_SIZE, TMP_INIT, TMP_FILL, TMP_IS_EMPTY, TMP_IS_MATCH, TMP_PULL_HASH, TMP_HASH, TMP_MEM, TMP_EXIST, TMP_RET, HASH_LOAD, res, name, hash->bins, hash->bcnt, hash->ecnt, out, caps, term);
+	return res;
 }
+
+#undef TMP_MALLOC
+#undef TMP_FREE
+#undef TMP_NEW_SIZE
+#undef TMP_INIT
+#undef TMP_FILL
+#undef TMP_IS_EMPTY
+#undef TMP_IS_MATCH
+#undef TMP_PULL_HASH
+#undef TMP_HASH
+#undef TMP_MEM
+#undef TMP_EXIST
+#undef TMP_RET
+#undef TMP_ERR
 
 int gen_bld(char const* restrict srcpath, gen_type* restrict gen) {
 	FILE* src = fopen(srcpath, "rb");

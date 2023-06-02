@@ -34,13 +34,13 @@
 		_is_empty((_flg1), ((_bins)[_loc]), ##__VA_ARGS__);\
 		if (_flg1) {_err((_out), ##__VA_ARGS__); break;}\
 		_Bool _flg2;\
-		_is_match((_flg2), (_key), ((_bins)[loc]), ##__VA_ARGS__);\
-		if (_flg2) {_ret((_out), ((_bins)[loc]), ##__VA_ARGS__); break;}\
+		_is_match((_flg2), (_key), ((_bins)[_loc]), ##__VA_ARGS__);\
+		if (_flg2) {_ret((_out), ((_bins)[_loc]), ##__VA_ARGS__); break;}\
 		_loc = (_loc + 1) % (_bcnt);\
 	}\
 } while (0)
 
-#define HASH_ADD(_bint_type, _malloc, _free, _new_size, _init, _fill, _is_empty, _is_match, _pull_hash, _hash, _mem, _exist, _ret, _load, _out, _key, _bins, _bcnt, _ecnt, ...) do {\
+#define HASH_ADD(_bin_type, _malloc, _free, _new_size, _init, _fill, _is_empty, _is_match, _pull_hash, _hash, _mem, _exist, _ret, _load, _out, _key, _bins, _bcnt, _ecnt, ...) do {\
 	if ((_bcnt) * (_load) <= (_ecnt)) {\
 		unsigned long long int _nb;\
 		_new_size((_nb), (_bcnt), ##__VA_ARGS__);\
@@ -54,7 +54,7 @@
 		_bin_type const* const _end = (_bins) + (_bcnt);\
 		for (_bin_type* _curr = (_bins); _curr != _end; ++_curr) {\
 			_Bool _flg;\
-			_is_empty((_flg), (*_cur), ##__VA_ARGS__);\
+			_is_empty((_flg), (*_curr), ##__VA_ARGS__);\
 			if (!_flg) {\
 				unsigned long long int _loc;\
 				_pull_hash((_loc), (*_curr), ##__VA_ARGS__);\
@@ -86,7 +86,7 @@
 	}\
 	if (_chk) {_exist((_out), (_hs), (_key), ((_bins)[_loc]), ##__VA_ARGS__); break;}\
 	_fill((_chk), (_hs), (_key), ((_bins)[_loc]), ##__VA_ARGS__);\
-	if (_chk) break;\
+	if (_chk) {_mem((_out), ##__VA_ARGS__); break;}\
 	++(_ecnt);\
 	_ret((_out), ((_bins)[_loc]), ##__VA_ARGS__);\
 } while (0)
