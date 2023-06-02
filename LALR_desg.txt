@@ -1,0 +1,45 @@
+LALR parser generator
+
+phase 1, read input and convert into interior representation
+  * creates grammer, symbols, nonterminals, etc.
+  (FINISHED from LL(1))
+
+phase 2, construct LALR(1) table for code generation
+
+  - phase 2a, build the full collection of item sets
+
+  struct heap_is iheap;
+
+  struct item_set {
+  	struct heap_rref ker;
+	struct heap_nt_to_ind ntms;
+	struct gen_rind* rules;
+	size_t rule_cnt;
+  };
+
+    * populate initial table for terminal and nonterminal
+    * have a queue of item sets
+	* build a temp trans array of heap of rule references
+	* init to empty heaps
+	* for each item set
+	  * iterate through each rule in the kernal (heap of rule references), then the rule references
+	    * if first exists and is terminal add to temp at location
+		* if first exists and is nonterminal add to temp at location
+		  *  if nonterm is not in ntms, add new entry for ntms for this nonterminal
+    * for each heap in temp, check for matching in iheap, and set tentry in table
+	* otherwise add new item set to the queue
+
+  - phase 2b, using the item sets, construct the follow sets and build the table
+
+  locate all rules A * [] ..., then add [] to the follow of A, and to the traversals for those A generated rules
+  for modified rules -> A [] to lam? ... to lam?
+
+phase 3, using generated table, write C code for the LALR(1) parser
+
+LALR(1) table format:
+
+  * 2 tables (nonterminal and terminal)
+
+  * nonterminal, each cell is either a syntax error, or a shift to some state
+  * terminal, each cell is either a syntax error, a shift, a reduce, or an end reduce
+  * each state for the table is an item set akin to that of an SLR(1) parser

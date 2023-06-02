@@ -1,7 +1,7 @@
 -- sticter restrictions on rule nature
--- better interior integer type representations
-
 
 -- double check memory safety for both generator and generated code
 
 -- rework documentation
+
+-- implement LALR(1) generation

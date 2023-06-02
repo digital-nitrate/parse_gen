@@ -5,13 +5,15 @@
 
 #define GEN_SIND_PRI "u"
 #define GEN_SIND_BIT (30)
-#define GEN_SIND_MAX ((gen_sind)((1U << 30) - 1))
+#define GEN_SIND_MAX ((gen_sind)((1U << GEN_SIND_BIT) - 1))
 #define GEN_RIND_PRI "u"
-#define GEN_RIND_BIT (31)
-#define GEN_RIND_MAX ((gen_rind)((1U << 31) - 1))
+#define GEN_RIND_BIT (30)
+#define GEN_RIND_MAX ((gen_rind)((1U << GEN_RIND_BIT) - 1))
 #define GEN_ROFF_PRI "hhu"
 #define GEN_ROFF_BIT (7)
-#define GEN_ROFF_MAX ((gen_roff)((1U << 7) - 1))
+#define GEN_ROFF_MAX ((gen_roff)((1U << GEN_ROFF_BIT) - 1))
+#define GEN_STAT_BIT (31)
+#define GEN_STAT_MAX ((gen_stat)((1U << GEN_STAT_BIT) - 1))
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,6 +22,11 @@ extern "C" {
 typedef unsigned int gen_sind;
 typedef unsigned int gen_rind;
 typedef unsigned char gen_roff;
+typedef unsigned int gen_stat;
+
+typedef struct gen_lrentry {
+	unsigned int val:GEN_RIND_BIT, redu:1, cont:1;
+} gen_lrentry;
 
 typedef struct gen_sid {
 	unsigned int ind:GEN_SIND_BIT, term:1, error:1;
@@ -109,6 +116,8 @@ extern int gen_wrt_ll1(gen_type const* restrict, gen_rind const* restrict, char 
 extern int gen_wrt_ll1_h(gen_type const* restrict, char const* restrict);
 extern void gen_fini(gen_type*);
 extern void gen_act_fini(gen_act*);
+
+extern int gen_bld_lalr1(gen_type const* restrict, gen_stat* restrict, gen_lrentry** restrict, gen_lrentry** restrict);
 
 #ifdef __cplusplus
 }
