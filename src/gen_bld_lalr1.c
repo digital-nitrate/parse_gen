@@ -9,9 +9,19 @@
 #define HASH_BASE (19)
 #define HASH_LOAD (0.7)
 
+struct rule_bul {
+	gen_rind rule;
+	gen_roff bul;
+};
+
+struct ker_hash_bin {
+	struct rule_bul ref;
+	_Bool active;
+};
+
 struct ntm_hash_bin {
-	size_t offset;
 	gen_sind sym;
+	_Bool active;
 };
 
 struct ntm_hash {
@@ -21,21 +31,14 @@ struct ntm_hash {
 };
 
 struct ker_hash {
-	struct rule_bul* bins;
+	struct ker_hash_bin* bins;
 	size_t bcnt;
 	size_t ecnt;
-};
-
-struct rule_bul {
-	gen_rind rule;
-	gen_roff bul;
 };
 
 struct item_set {
 	struct ker_hash kernal;
 	struct ntm_hash ntm_map;
-	gen_rind* clo_rules;
-	size_t clo_cnt;
 };
 
 struct item_graph {
@@ -52,7 +55,7 @@ struct rarr {
 };
 
 struct ntdata {
-	unsigned int lambda:1, first:1, follow:1;
+	unsigned int lambda:1, first:1;
 	struct rarr rh;
 	struct rarr lh;
 };
@@ -161,20 +164,20 @@ static void bld_lam(gen_type const* restrict gen, gen_sind* restrict queue, stru
 	(_nb) = (_bcnt) * 2 - 1;\
 } while (0)
 #define TMP_INIT(_bin, ...) do {\
-	(_bin).rule = GEN_RIND_MAX;\
-	(_bin).bul = GEN_ROFF_MAX;\
+	(_bin).ref.rule = GEN_RIND_MAX;\
 } while (0)
 #define TMP_FILL(_chk, _hs, _key, _bin, ...) do {\
-	(_bin) = (_key);\
+	(_bin).ref = (_key);\
+	(_bin).active = 0;\
 } while (0)
 #define TMP_IS_EMPTY(_flg, _bin, ...) do {\
-	(_flg) = ((_bin).rule == GEN_RIND_MAX);\
+	(_flg) = ((_bin).ref.rule == GEN_RIND_MAX);\
 } while (0)
 #define TMP_IS_MATCH(_flg, _key, _bin, ...) do {\
-	(_flg) = (((_bin).rule == (_key).rule) && ((_bin).bul == (_key).bul));\
+	(_flg) = (((_bin).ref.rule == (_key).rule) && ((_bin).ref.bul == (_key).bul));\
 } while (0)
 #define TMP_PULL_HASH(_hs, _bin, ...) do {\
-	(_hs) = (307) * (_bin).rule + (301) * (_bin).bul;\
+	(_hs) = (307) * (_bin).ref.rule + (301) * (_bin).ref.bul;\
 } while (0)
 #define TMP_HASH(_hs, _key, ...) do {\
 	(_hs) = (307) * (_key).rule + (301) * (_key).bul;\
@@ -193,7 +196,7 @@ static void bld_lam(gen_type const* restrict gen, gen_sind* restrict queue, stru
 } while (0)
 
 static int ker_hash_init(struct ker_hash* table) {
-	HASH_INIT(struct rule_bul, TMP_INIT, TMP_MALLOC, HASH_BASE, table->bins, table->bcnt, table->ecnt);
+	HASH_INIT(struct ker_hash_bin, TMP_INIT, TMP_MALLOC, HASH_BASE, table->bins, table->bcnt, table->ecnt);
 	return (table->bins == NULL) ? 1 : 0;
 }
 
@@ -205,7 +208,7 @@ static int ker_hash_ld(struct ker_hash const* table, struct rule_bul rule) {
 
 static int ker_hash_add(struct ker_hash* table, struct rule_bul rule) {
 	int res;
-	HASH_ADD(struct rule_bul, TMP_MALLOC, TMP_FREE, TMP_NEW_SIZE, TMP_INIT, TMP_FILL, TMP_IS_EMPTY, TMP_IS_MATCH, TMP_PULL_HASH, TMP_HASH, TMP_MEM, TMP_EXIST, TMP_RET, HASH_LOAD, res, rule, table->bins, table->bcnt, table->ecnt);
+	HASH_ADD(struct ker_hash_bin, TMP_MALLOC, TMP_FREE, TMP_NEW_SIZE, TMP_INIT, TMP_FILL, TMP_IS_EMPTY, TMP_IS_MATCH, TMP_PULL_HASH, TMP_HASH, TMP_MEM, TMP_EXIST, TMP_RET, HASH_LOAD, res, rule, table->bins, table->bcnt, table->ecnt);
 	return res;
 }
 
@@ -233,28 +236,20 @@ static int ker_hash_add(struct ker_hash* table, struct rule_bul rule) {
 	(_nb) = (_bcnt) * 2 - 1;\
 } while (0)
 #define TMP_INIT(_bin, ...) do {\
-	(_bin).offset = SIZE_MAX;\
 	(_bin).sym = GEN_SIND_MAX;\
 } while (0)
-#define TMP_FILL(_chk, _hs, _key, _bin, _rules, _cnt, _cap, _nmet, ...) do {\
+#define TMP_FILL(_chk, _hs, _key, _bin, _rque, _rque_top, _nmet, ...) do {\
 	struct rarr const* refs = &((_nmet)[(_key)].lh);\
-	if ((_cnt) + refs->cnt > (_cap)) {\
-		size_t ns = (_cnt + refs->cnt > 2 * (_cap)) ? _cnt + refs->cnt : 2 * (_cap);\
-		gen_rind* nr = realloc((_rules), (sizeof *(_rules)) * ns);\
-		if (nr == NULL) {(_chk) = 1; break;}\
-		(_rules) = nr;\
-		(_cap) = ns;\
-	}\
-	(_bin).offset = (_cnt);\
+	(_bin).active = 0;\
 	(_bin).sym = (_key);\
 	struct rule_bul const* rend = refs->refs + refs->cnt;\
 	for (struct rule_bul const* rcur = refs->refs; rcur != rend; ++rcur) {\
-		(_rules)[(_cnt)] = rcur->rule;\
-		++(_cnt);\
+		(_rque)[(_rque_top)] = rcur->rule;\
+		++(_rque_top);\
 	}\
 } while (0)
 #define TMP_IS_EMPTY(_flg, _bin, ...) do {\
-	(_flg) = ((_bin).offset == SIZE_MAX);\
+	(_flg) = ((_bin).sym == GEN_SIND_MAX);\
 } while (0)
 #define TMP_IS_MATCH(_flg, _key, _bin, ...) do {\
 	(_flg) = ((_bin).sym == (_key));\
@@ -278,41 +273,35 @@ static int ker_hash_add(struct ker_hash* table, struct rule_bul rule) {
 	(_out) = 1;\
 } while (0)
 
-static int bld_item_set(gen_type const* restrict grm, struct ntdata* restrict nmet, struct item_set* restrict set, struct ker_hash* restrict ker) {
+//TODO Add reference tracking
+static int clo_item_set(gen_type const* restrict grm, struct ntdata* restrict nmet, gen_rind* restrict rque, struct ker_hash* restrict tarr, struct ker_hash* restrict narr, struct item_set* restrict set) {
 	HASH_INIT(struct ntm_hash_bin, TMP_INIT, TMP_MALLOC, HASH_BASE, set->ntm_map.bins, set->ntm_map.bcnt, set->ntm_map.ecnt);
 	if (set->ntm_map.bins == NULL) goto Fail;
-	gen_rind* rules = malloc((sizeof *rules) * 16);
-	if (rules == NULL) goto CleanHash;
-	size_t cap = 16;
-	size_t cnt = 0;
-	set->kernal = *ker;
-	struct rule_bul const* ker_end = set->kernal.bins + set->kernal.bcnt;
-	for (struct rule_bul const* curr = set->kernal.bins; curr != ker_end; ++curr) {
-		if (curr->rule == GEN_RIND_MAX) continue;
-		gen_slist const* rhs = &(grm->rules[curr->rule].rhs);
-		if (rhs->cnt == curr->bul) continue;
-		gen_sid sym = rhs->syms[curr->bul];
+	size_t rque_top = 0;
+	struct ker_hash_bin const* ker_end = set->kernal.bins + set->kernal.bcnt;
+	for (struct ker_hash_bin const* curr = set->kernal.bins; curr != ker_end; ++curr) {
+		if (curr->ref.rule == GEN_RIND_MAX) continue;
+		gen_slist const* rhs = &(grm->rules[curr->ref.rule].rhs);
+		if (rhs->cnt == curr->ref.bul) continue;
+		gen_sid sym = rhs->syms[curr->ref.bul];
+		if (ker_hash_add(sym.ind + (sym.term ? tarr : narr), (struct rule_bul){.rule=curr->ref.rule,.bul=curr->ref.bul+1})) goto CleanHash;
 		if (sym.term) continue;
 		int res;
-		HASH_ADD(struct ntm_hash_bin, TMP_MALLOC, TMP_FREE, TMP_NEW_SIZE, TMP_INIT, TMP_FILL, TMP_IS_EMPTY, TMP_IS_MATCH, TMP_PULL_HASH, TMP_HASH, TMP_MEM, TMP_EXIST, TMP_RET, HASH_LOAD, res, sym.ind, set->ntm_map.bins, set->ntm_map.bcnt, set->ntm_map.ecnt, rules, cnt, cap, nmet);
-		if (res == 2) goto CleanArr;
+		HASH_ADD(struct ntm_hash_bin, TMP_MALLOC, TMP_FREE, TMP_NEW_SIZE, TMP_INIT, TMP_FILL, TMP_IS_EMPTY, TMP_IS_MATCH, TMP_PULL_HASH, TMP_HASH, TMP_MEM, TMP_EXIST, TMP_RET, HASH_LOAD, res, sym.ind, set->ntm_map.bins, set->ntm_map.bcnt, set->ntm_map.ecnt, rque, rque_top, nmet);
+		if (res == 2) goto CleanHash;
 	}
-	for (size_t curr = 0; curr != cnt; ++curr) {
-		gen_slist const* rhs = &(grm->rules[rules[curr]].rhs);
+	for (size_t rque_curr = 0; rque_curr != rque_top; ++rque_curr) {
+		gen_rind rule = rque[rque_curr];
+		gen_slist const* rhs = &(grm->rules[rule].rhs);
 		if (rhs->cnt == 0) continue;
 		gen_sid sym = rhs->syms[0];
+		if (ker_hash_add(sym.ind + (sym.term ? tarr : narr), (struct rule_bul){.rule=rule,.bul=1})) goto CleanHash;
 		if (sym.term) continue;
 		int res;
-		HASH_ADD(struct ntm_hash_bin, TMP_MALLOC, TMP_FREE, TMP_NEW_SIZE, TMP_INIT, TMP_FILL, TMP_IS_EMPTY, TMP_IS_MATCH, TMP_PULL_HASH, TMP_HASH, TMP_MEM, TMP_EXIST, TMP_RET, HASH_LOAD, res, sym.ind, set->ntm_map.bins, set->ntm_map.bcnt, set->ntm_map.ecnt, rules, cnt, cap, nmet);
-		if (res == 2) goto CleanArr;
+		HASH_ADD(struct ntm_hash_bin, TMP_MALLOC, TMP_FREE, TMP_NEW_SIZE, TMP_INIT, TMP_FILL, TMP_IS_EMPTY, TMP_IS_MATCH, TMP_PULL_HASH, TMP_HASH, TMP_MEM, TMP_EXIST, TMP_RET, HASH_LOAD, res, sym.ind, set->ntm_map.bins, set->ntm_map.bcnt, set->ntm_map.ecnt, rque, rque_top, nmet);
+		if (res == 2) goto CleanHash;
 	}
-	set->clo_rules = rules;
-	set->clo_cnt = cnt;
-	ker->bins = NULL;
-	ker->bcnt = 0;
-	ker->ecnt = 0;
 	return 0;
-	CleanArr: free(rules);
 	CleanHash: free(set->ntm_map.bins);
 	Fail: return 1;
 }
